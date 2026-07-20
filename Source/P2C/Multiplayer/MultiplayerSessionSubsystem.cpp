@@ -3,11 +3,9 @@
 #include "OnlineSessionSettings.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
-#include "GameFramework/PlayerController.h"
-#include "Kismet/GameplayStatics.h"
-#include "Engine/Engine.h"
-#include "Engine/NetDriver.h"
 #include "Map/P2CTravelSubsystem.h"
+#include "Services/P2CConnectionRecoveryService.h"
+#include "UObject/UObjectGlobals.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMultiplayerSessions, Log, All);
 
@@ -41,53 +39,43 @@ void UMultiplayerSessionSubsystem::Initialize(FSubsystemCollectionBase& Collecti
 {
     Super::Initialize(Collection);
 
-    if (!GEngine)
+    ConnectionRecoveryService = NewObject<UP2CConnectionRecoveryService>(this);
+
+    if (!IsValid(ConnectionRecoveryService))
     {
         UE_LOG(
             LogMultiplayerSessions,
             Error,
-            TEXT("Cannot register failure handlers: GEngine is invalid."));
+            TEXT(
+                "Could not create "
+                "ConnectionRecoveryService."));
 
         return;
     }
 
-    NetworkFailureDelegateHandle =
-        GEngine->OnNetworkFailure().AddUObject(
-            this,
-            &UMultiplayerSessionSubsystem::HandleNetworkFailure);
+    ConnectionRecoveryService->OnRecoveryRequested.AddUObject(
+        this,
+        &UMultiplayerSessionSubsystem::HandleConnectionRecoveryRequested);
 
-    TravelFailureDelegateHandle =
-        GEngine->OnTravelFailure().AddUObject(
-            this,
-            &UMultiplayerSessionSubsystem::HandleTravelFailure);
+    ConnectionRecoveryService->Initialize(GetGameInstance());
 
     UE_LOG(
         LogMultiplayerSessions,
         Log,
-        TEXT("Network and travel failure handlers registered."));
+        TEXT(
+            "Multiplayer session subsystem initialized."));
 }
 
 void UMultiplayerSessionSubsystem::Deinitialize()
 {
-    if (GEngine)
+    if (IsValid(ConnectionRecoveryService))
     {
-        if (NetworkFailureDelegateHandle.IsValid())
-        {
-            GEngine->OnNetworkFailure().Remove(
-                NetworkFailureDelegateHandle);
-        }
+        ConnectionRecoveryService->OnRecoveryRequested.RemoveAll(this);
 
-        if (TravelFailureDelegateHandle.IsValid())
-        {
-            GEngine->OnTravelFailure().Remove(
-                TravelFailureDelegateHandle);
-        }
+        ConnectionRecoveryService->Deinitialize();
+        ConnectionRecoveryService = nullptr;
     }
 
-    NetworkFailureDelegateHandle.Reset();
-    TravelFailureDelegateHandle.Reset();
-    bIsRecoveringFromFailure = false;
-    
     const IOnlineSessionPtr SessionInterface = GetSessionInterface();
     if (SessionInterface.IsValid())
     {
@@ -132,9 +120,40 @@ void UMultiplayerSessionSubsystem::Deinitialize()
     Super::Deinitialize();
 }
 
+void UMultiplayerSessionSubsystem::HandleConnectionRecoveryRequested()
+{
+    const IOnlineSessionPtr SessionInterface = GetSessionInterface();
+
+    if (SessionInterface.IsValid() 
+        && SessionInterface->GetNamedSession(NAME_GameSession) != nullptr)
+    {
+        UE_LOG(
+            LogMultiplayerSessions,
+            Log,
+            TEXT(
+                "Cleaning up session after "
+                "connection failure."));
+
+        LeaveSession();
+        return;
+    }
+
+    LastSessionSettings.Reset();
+    LastSessionSearch.Reset();
+    CachedSessionResults.Reset();
+
+    UE_LOG(
+        LogMultiplayerSessions,
+        Log,
+        TEXT(
+            "No active session found during recovery. "
+            "Returning to MainMenu."));
+    
+    ReturnToMainMenu();
+}
+
 void UMultiplayerSessionSubsystem::CreateSession(const int32 NumPublicConnections)
 {
-    bIsRecoveringFromFailure = false;
     const IOnlineSessionPtr SessionInterface = GetSessionInterface();
 
     if (!SessionInterface.IsValid())
@@ -187,6 +206,11 @@ void UMultiplayerSessionSubsystem::CreateSession(const int32 NumPublicConnection
         MatchTypeValue,
         EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 
+    if (IsValid(ConnectionRecoveryService))
+    {
+        ConnectionRecoveryService->ResetRecoveryState();
+    }
+
     CreateSessionCompleteDelegateHandle =
         SessionInterface->AddOnCreateSessionCompleteDelegate_Handle(
             CreateSessionCompleteDelegate);
@@ -223,7 +247,6 @@ void UMultiplayerSessionSubsystem::CreateSession(const int32 NumPublicConnection
 
 void UMultiplayerSessionSubsystem::FindSessions(const int32 MaxSearchResults)
 {
-    bIsRecoveringFromFailure = false;
     CachedSessionResults.Reset();
 
     const IOnlineSessionPtr SessionInterface = GetSessionInterface();
@@ -269,6 +292,11 @@ void UMultiplayerSessionSubsystem::FindSessions(const int32 MaxSearchResults)
 
     LastSessionSearch->bIsLanQuery = bIsLanQuery;
     LastSessionSearch->PingBucketSize = 50;
+
+    if (IsValid(ConnectionRecoveryService))
+    {
+        ConnectionRecoveryService->ResetRecoveryState();
+    }
 
     FindSessionsCompleteDelegateHandle =
         SessionInterface
@@ -350,7 +378,7 @@ void UMultiplayerSessionSubsystem::HandleCreateSessionComplete(const FName Sessi
         return;
     }
 
-    UP2CTravelSubsystem* TravelSubsystem = GetGameInstance()->GetSubsystem<UP2CTravelSubsystem>();
+    UP2CTravelSubsystem* TravelSubsystem = GetTravelSubsystem();
 
     if (!IsValid(TravelSubsystem))
     {
@@ -494,7 +522,6 @@ void UMultiplayerSessionSubsystem::HandleFindSessionsComplete(const bool bWasSuc
 
 void UMultiplayerSessionSubsystem::JoinSession(const int32 CachedResultIndex)
 {
-    bIsRecoveringFromFailure = false;
     const IOnlineSessionPtr SessionInterface = GetSessionInterface();
 
     if (!SessionInterface.IsValid())
@@ -571,6 +598,11 @@ void UMultiplayerSessionSubsystem::JoinSession(const int32 CachedResultIndex)
         return;
     }
 
+    if (IsValid(ConnectionRecoveryService))
+    {
+        ConnectionRecoveryService->ResetRecoveryState();
+    }
+    
     JoinSessionCompleteDelegateHandle =
         SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(
             JoinSessionCompleteDelegate);
@@ -589,10 +621,7 @@ void UMultiplayerSessionSubsystem::JoinSession(const int32 CachedResultIndex)
 
     if (!bRequestStarted)
     {
-        SessionInterface
-            ->ClearOnJoinSessionCompleteDelegate_Handle(
-                JoinSessionCompleteDelegateHandle);
-
+        SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
         JoinSessionCompleteDelegateHandle.Reset();
 
         UE_LOG(
@@ -667,35 +696,8 @@ void UMultiplayerSessionSubsystem::HandleJoinSessionComplete(const FName Session
         OnJoinSessionCompleted.Broadcast(false);
         return;
     }
-
-    UWorld* World = GetWorld();
-
-    if (!IsValid(World))
-    {
-        UE_LOG(
-            LogMultiplayerSessions,
-            Error,
-            TEXT("Session joined, but World is invalid."));
-
-        OnJoinSessionCompleted.Broadcast(false);
-        return;
-    }
-
-    APlayerController* PlayerController =
-        World->GetFirstPlayerController();
-
-    if (!IsValid(PlayerController))
-    {
-        UE_LOG(
-            LogMultiplayerSessions,
-            Error,
-            TEXT("Session joined, but PlayerController is invalid."));
-
-        OnJoinSessionCompleted.Broadcast(false);
-        return;
-    }
-
-    UP2CTravelSubsystem* TravelSubsystem =GetGameInstance()->GetSubsystem<UP2CTravelSubsystem>();
+    
+    UP2CTravelSubsystem* TravelSubsystem = GetTravelSubsystem();
 
     if (!IsValid(TravelSubsystem) ||!TravelSubsystem->ClientTravelToAddress(ConnectString))
     {
@@ -724,9 +726,9 @@ void UMultiplayerSessionSubsystem::LeaveSession()
 
         OnLeaveSessionCompleted.Broadcast(false);
 
-        if (bIsRecoveringFromFailure)
+        if (IsRecoveringFromFailure())
         {
-            GetTravelSubsystem()->OpenMap(EP2CMapType::MainMenu);
+            ReturnToMainMenu();
         }
 
         return;
@@ -743,7 +745,7 @@ void UMultiplayerSessionSubsystem::LeaveSession()
         return;
     }
 
-    const FNamedOnlineSession* ExistingSession =
+    const FNamedOnlineSession* ExistingSession = 
         SessionInterface->GetNamedSession(NAME_GameSession);
 
     if (ExistingSession == nullptr)
@@ -758,7 +760,7 @@ void UMultiplayerSessionSubsystem::LeaveSession()
         CachedSessionResults.Reset();
 
         OnLeaveSessionCompleted.Broadcast(true);
-        GetTravelSubsystem()->OpenMap(EP2CMapType::MainMenu);
+        ReturnToMainMenu();
         return;
     }
 
@@ -789,7 +791,7 @@ void UMultiplayerSessionSubsystem::LeaveSession()
 
         OnLeaveSessionCompleted.Broadcast(false);
 
-        if (bIsRecoveringFromFailure)
+        if (IsRecoveringFromFailure())
         {
             UE_LOG(
                 LogMultiplayerSessions,
@@ -798,7 +800,7 @@ void UMultiplayerSessionSubsystem::LeaveSession()
                     "DestroySession could not start during recovery. "
                     "Returning to MainMenu anyway."));
 
-            GetTravelSubsystem()->OpenMap(EP2CMapType::MainMenu);
+            ReturnToMainMenu();
         }
     }
 }
@@ -819,8 +821,7 @@ void UMultiplayerSessionSubsystem::HandleDestroySessionComplete(
 
     DestroySessionCompleteDelegateHandle.Reset();
 
-    const bool bWasRecoveringFromFailure =
-        bIsRecoveringFromFailure;
+    const bool bWasRecoveringFromFailure = IsRecoveringFromFailure();
 
     UE_LOG(
         LogMultiplayerSessions,
@@ -842,7 +843,7 @@ void UMultiplayerSessionSubsystem::HandleDestroySessionComplete(
                     "Session cleanup failed during recovery. "
                     "Returning to MainMenu anyway."));
 
-            GetTravelSubsystem()->OpenMap(EP2CMapType::MainMenu);
+            ReturnToMainMenu();
         }
 
         return;
@@ -854,120 +855,12 @@ void UMultiplayerSessionSubsystem::HandleDestroySessionComplete(
 
     OnLeaveSessionCompleted.Broadcast(true);
     
-    GetTravelSubsystem()->OpenMap(EP2CMapType::MainMenu);
+    ReturnToMainMenu();
 }
 
 TArray<FP2CSessionSearchResult>UMultiplayerSessionSubsystem::GetCachedSessionResults() const
 {
     return CachedSessionResults;
-}
-
-bool UMultiplayerSessionSubsystem::IsFailureForThisGameInstance(const UWorld* World) const
-{
-    return IsValid(World) &&
-        World->GetGameInstance() == GetGameInstance();
-}
-
-void UMultiplayerSessionSubsystem::HandleNetworkFailure(
-    UWorld* World,
-    UNetDriver*,
-    const ENetworkFailure::Type FailureType,
-    const FString& ErrorString)
-{
-    if (!IsFailureForThisGameInstance(World))
-    {
-        return;
-    }
-
-    if (bIsRecoveringFromFailure)
-    {
-        UE_LOG(
-            LogMultiplayerSessions,
-            Verbose,
-            TEXT(
-                "Ignoring additional network failure during recovery. "
-                "Type: %d"),
-            static_cast<int32>(FailureType));
-
-        return;
-    }
-
-    UE_LOG(
-        LogMultiplayerSessions,
-        Error,
-        TEXT("Network failure. Type: %d, Error: %s"),
-        static_cast<int32>(FailureType),
-        *ErrorString);
-
-    RecoverFromConnectionFailure();
-}
-
-void UMultiplayerSessionSubsystem::HandleTravelFailure(
-    UWorld* World,
-    const ETravelFailure::Type FailureType,
-    const FString& ErrorString)
-{
-    if (!IsFailureForThisGameInstance(World))
-    {
-        return;
-    }
-    
-    if (bIsRecoveringFromFailure)
-    {
-        return;
-    }
-
-    UE_LOG(
-        LogMultiplayerSessions,
-        Error,
-        TEXT("Travel failure. Type: %d, Error: %s"),
-        static_cast<int32>(FailureType),
-        *ErrorString);
-
-    RecoverFromConnectionFailure();
-}
-
-void UMultiplayerSessionSubsystem::RecoverFromConnectionFailure()
-{
-    if (bIsRecoveringFromFailure)
-    {
-        UE_LOG(
-            LogMultiplayerSessions,
-            Verbose,
-            TEXT("Connection recovery is already in progress."));
-
-        return;
-    }
-
-    bIsRecoveringFromFailure = true;
-
-    const IOnlineSessionPtr SessionInterface =
-        GetSessionInterface();
-
-    if (SessionInterface.IsValid() &&
-        SessionInterface->GetNamedSession(NAME_GameSession) != nullptr)
-    {
-        UE_LOG(
-            LogMultiplayerSessions,
-            Log,
-            TEXT("Cleaning up session after connection failure."));
-
-        LeaveSession();
-        return;
-    }
-
-    LastSessionSettings.Reset();
-    LastSessionSearch.Reset();
-    CachedSessionResults.Reset();
-
-    UE_LOG(
-        LogMultiplayerSessions,
-        Log,
-        TEXT(
-            "No active session found during recovery. "
-            "Returning to MainMenu."));
-    
-    GetTravelSubsystem()->OpenMap(EP2CMapType::MainMenu);
 }
 
 UP2CTravelSubsystem* UMultiplayerSessionSubsystem::GetTravelSubsystem() const
@@ -977,4 +870,28 @@ UP2CTravelSubsystem* UMultiplayerSessionSubsystem::GetTravelSubsystem() const
     return IsValid(GameInstance)
         ? GameInstance->GetSubsystem<UP2CTravelSubsystem>()
         : nullptr;
+}
+
+bool UMultiplayerSessionSubsystem::ReturnToMainMenu() const
+{
+    UP2CTravelSubsystem* TravelSubsystem = GetTravelSubsystem();
+
+    if (!IsValid(TravelSubsystem))
+    {
+        UE_LOG(
+            LogMultiplayerSessions,
+            Error,
+            TEXT(
+                "Cannot return to MainMenu: "
+                "TravelSubsystem is invalid."));
+
+        return false;
+    }
+
+    return TravelSubsystem->OpenMap(EP2CMapType::MainMenu);
+}
+
+bool UMultiplayerSessionSubsystem::IsRecoveringFromFailure() const
+{
+    return IsValid(ConnectionRecoveryService) && ConnectionRecoveryService->IsRecovering();
 }

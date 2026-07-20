@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "Map/P2CTravelSubsystem.h"
-class UNetDriver;
 
 #include "CoreMinimal.h"
 #include "Interfaces/OnlineSessionInterface.h"
@@ -8,6 +7,9 @@ class UNetDriver;
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Engine/EngineBaseTypes.h"
 #include "MultiplayerSessionSubsystem.generated.h"
+
+class UNetDriver;
+class UP2CConnectionRecoveryService;
 
 USTRUCT(BlueprintType)
 struct FP2CSessionSearchResult
@@ -108,29 +110,15 @@ private:
         EOnJoinSessionCompleteResult::Type Result
     );
     
-    void HandleDestroySessionComplete(
-    FName SessionName,
-    bool bWasSuccessful);
-
-    void HandleNetworkFailure(
-        UWorld* World,
-        UNetDriver*,
-        ENetworkFailure::Type FailureType,
-        const FString& ErrorString
-    );
-    
-    void HandleTravelFailure(
-        UWorld* World,
-        ETravelFailure::Type FailureType,
-        const FString& ErrorString
-    );
-
-    bool IsFailureForThisGameInstance(const UWorld* World) const;
-    void RecoverFromConnectionFailure();
+    void HandleDestroySessionComplete(FName SessionName, bool bWasSuccessful);
+    void HandleConnectionRecoveryRequested();
+    bool ReturnToMainMenu() const;
+    bool IsRecoveringFromFailure() const;
     UP2CTravelSubsystem* GetTravelSubsystem() const;
 
-
-    bool bIsRecoveringFromFailure = false;
+    UPROPERTY(Transient)
+    TObjectPtr<UP2CConnectionRecoveryService> ConnectionRecoveryService;
+    
     TSharedPtr<FOnlineSessionSettings> LastSessionSettings;
     TSharedPtr<FOnlineSessionSearch> LastSessionSearch;
     TArray<FP2CSessionSearchResult> CachedSessionResults;
@@ -144,7 +132,4 @@ private:
     FDelegateHandle FindSessionsCompleteDelegateHandle;
     FDelegateHandle JoinSessionCompleteDelegateHandle;
     FDelegateHandle DestroySessionCompleteDelegateHandle;
-
-    FDelegateHandle NetworkFailureDelegateHandle;
-    FDelegateHandle TravelFailureDelegateHandle;
 };

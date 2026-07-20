@@ -18,10 +18,14 @@ public class P2C : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"Slate"
+			"Slate",
+			"OnlineSubsystem",
+			"DeveloperSettings",
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] {
+			"OnlineSubsystemUtils"
+		});
 
 		PublicIncludePaths.AddRange(new string[] {
 			"P2C"

@@ -24,20 +24,7 @@ public class P2C : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
 		PublicIncludePaths.AddRange(new string[] {
-			"P2C",
-			"P2C/Variant_Platforming",
-			"P2C/Variant_Platforming/Animation",
-			"P2C/Variant_Combat",
-			"P2C/Variant_Combat/AI",
-			"P2C/Variant_Combat/Animation",
-			"P2C/Variant_Combat/Gameplay",
-			"P2C/Variant_Combat/Interfaces",
-			"P2C/Variant_Combat/UI",
-			"P2C/Variant_SideScrolling",
-			"P2C/Variant_SideScrolling/AI",
-			"P2C/Variant_SideScrolling/Gameplay",
-			"P2C/Variant_SideScrolling/Interfaces",
-			"P2C/Variant_SideScrolling/UI"
+			"P2C"
 		});
 
 		// Uncomment if you are using Slate UI

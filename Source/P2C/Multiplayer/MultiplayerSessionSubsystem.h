@@ -76,6 +76,12 @@ private:
     void HandleConnectionRecoveryRequested() const;
 
     void ReturnToMainMenu() const;
+    
+    bool InitializeOnlineSessionService();
+    bool InitializeConnectionRecoveryService();
+
+    void DeinitializeOnlineSessionService();
+    void DeinitializeConnectionRecoveryService();
 
     bool IsRecoveringFromFailure() const;
 

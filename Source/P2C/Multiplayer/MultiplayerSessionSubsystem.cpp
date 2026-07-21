@@ -9,8 +9,26 @@ DEFINE_LOG_CATEGORY_STATIC(LogMultiplayerSessions, Log, All);
 void UMultiplayerSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
     Super::Initialize(Collection);
-    
-    OnlineSessionService = NewObject<UP2COnlineSessionService>(this);
+
+    if (!InitializeOnlineSessionService())
+    {
+        return;
+    }
+
+    if (!InitializeConnectionRecoveryService())
+    {
+        DeinitializeOnlineSessionService();
+        return;
+    }
+
+    UE_LOG(
+        LogMultiplayerSessions,
+        Log,
+        TEXT("Multiplayer session subsystem initialized."));
+}
+
+bool UMultiplayerSessionSubsystem::InitializeOnlineSessionService(){
+    OnlineSessionService =NewObject<UP2COnlineSessionService>(this);
 
     if (!IsValid(OnlineSessionService))
     {
@@ -21,17 +39,16 @@ void UMultiplayerSessionSubsystem::Initialize(FSubsystemCollectionBase& Collecti
                 "Could not create "
                 "OnlineSessionService."));
 
-        return;
+        return false;
     }
 
     OnlineSessionService->OnCreateSessionCompleted
         .AddUObject(
             this,
-            &UMultiplayerSessionSubsystem::
-                HandleOnlineCreateSessionCompleted);
+            &UMultiplayerSessionSubsystem::HandleOnlineCreateSessionCompleted);
 
     OnlineSessionService->OnFindSessionsCompleted
-        .AddUObject(
+    .AddUObject(
             this,
             &UMultiplayerSessionSubsystem::HandleOnlineFindSessionsCompleted);
 
@@ -46,8 +63,12 @@ void UMultiplayerSessionSubsystem::Initialize(FSubsystemCollectionBase& Collecti
             &UMultiplayerSessionSubsystem::HandleOnlineDestroySessionCompleted);
 
     OnlineSessionService->Initialize(GetGameInstance());
-    
-    ConnectionRecoveryService = NewObject<UP2CConnectionRecoveryService>(this);
+    return true;
+}
+
+bool UMultiplayerSessionSubsystem::InitializeConnectionRecoveryService()
+{
+    ConnectionRecoveryService =NewObject<UP2CConnectionRecoveryService>(this);
 
     if (!IsValid(ConnectionRecoveryService))
     {
@@ -58,46 +79,52 @@ void UMultiplayerSessionSubsystem::Initialize(FSubsystemCollectionBase& Collecti
                 "Could not create "
                 "ConnectionRecoveryService."));
 
-        OnlineSessionService->Deinitialize();
-        OnlineSessionService = nullptr;
-        return;
+        return false;
     }
 
-    ConnectionRecoveryService->OnRecoveryRequested.AddUObject(
-        this,
-        &UMultiplayerSessionSubsystem::HandleConnectionRecoveryRequested);
+    ConnectionRecoveryService->OnRecoveryRequested
+        .AddUObject(
+            this,
+            &UMultiplayerSessionSubsystem::
+                HandleConnectionRecoveryRequested);
 
     ConnectionRecoveryService->Initialize(GetGameInstance());
-
-    UE_LOG(
-        LogMultiplayerSessions,
-        Log,
-        TEXT(
-            "Multiplayer session subsystem initialized."));
+    return true;
 }
 
 void UMultiplayerSessionSubsystem::Deinitialize()
 {
-    if (IsValid(ConnectionRecoveryService))
-    {
-        ConnectionRecoveryService->OnRecoveryRequested.RemoveAll(this);
+    DeinitializeConnectionRecoveryService();
+    DeinitializeOnlineSessionService();
 
-        ConnectionRecoveryService->Deinitialize();
-        ConnectionRecoveryService = nullptr;
-    }
-    
-    if (IsValid(OnlineSessionService))
-    {
-        OnlineSessionService->OnCreateSessionCompleted.RemoveAll(this);
-        OnlineSessionService->OnFindSessionsCompleted.RemoveAll(this);
-        OnlineSessionService->OnJoinSessionCompleted.RemoveAll(this);
-        OnlineSessionService->OnDestroySessionCompleted.RemoveAll(this);
-
-        OnlineSessionService->Deinitialize();
-        OnlineSessionService = nullptr;
-    }
-    
     Super::Deinitialize();
+}
+
+void UMultiplayerSessionSubsystem::DeinitializeConnectionRecoveryService()
+{
+    if (!IsValid(ConnectionRecoveryService))
+    {
+        return;
+    }
+
+    ConnectionRecoveryService->OnRecoveryRequested.RemoveAll(this);
+    ConnectionRecoveryService->Deinitialize();
+    ConnectionRecoveryService = nullptr;
+}
+
+void UMultiplayerSessionSubsystem::DeinitializeOnlineSessionService()
+{
+    if (!IsValid(OnlineSessionService))
+    {
+        return;
+    }
+
+    OnlineSessionService->OnCreateSessionCompleted.RemoveAll(this);
+    OnlineSessionService->OnFindSessionsCompleted.RemoveAll(this);
+    OnlineSessionService->OnJoinSessionCompleted.RemoveAll(this);
+    OnlineSessionService->OnDestroySessionCompleted.RemoveAll(this);
+    OnlineSessionService->Deinitialize();
+    OnlineSessionService = nullptr;
 }
 
 void UMultiplayerSessionSubsystem::CreateSession(const int32 NumPublicConnections)

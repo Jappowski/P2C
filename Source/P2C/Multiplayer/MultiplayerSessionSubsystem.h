@@ -1,62 +1,35 @@
 ﻿#pragma once
-#include "Map/P2CTravelSubsystem.h"
 
 #include "CoreMinimal.h"
-#include "Interfaces/OnlineSessionInterface.h"
-#include "OnlineSessionSettings.h"
 #include "Subsystems/GameInstanceSubsystem.h"
-#include "Engine/EngineBaseTypes.h"
+#include "Data/P2CSessionSearchResult.h"
 #include "MultiplayerSessionSubsystem.generated.h"
 
-class UNetDriver;
 class UP2CConnectionRecoveryService;
-
-USTRUCT(BlueprintType)
-struct FP2CSessionSearchResult
-{
-    GENERATED_BODY()
-
-    UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Sessions")
-    int32 ResultIndex = INDEX_NONE;
-
-    UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Sessions")
-    FString HostName;
-
-    UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Sessions")
-    int32 CurrentPlayers = 0;
-
-    UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Sessions")
-    int32 MaxPlayers = 0;
-
-    UPROPERTY(BlueprintReadOnly, Category = "Multiplayer|Sessions")
-    int32 PingInMs = 0;
-};
+class UP2COnlineSessionService;
+class UP2CTravelSubsystem;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
     FOnCreateSessionCompleted,
     bool,
-    bWasSuccessful
-);
+    bWasSuccessful);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
     FOnFindSessionsCompleted,
     bool,
     bWasSuccessful,
     int32,
-    ResultCount
-);
+    ResultCount);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
     FOnJoinSessionCompleted,
     bool,
-    bWasSuccessful
-);
+    bWasSuccessful);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
     FOnLeaveSessionCompleted,
     bool,
-    bWasSuccessful
-);
+    bWasSuccessful);
 
 UCLASS()
 class P2C_API UMultiplayerSessionSubsystem
@@ -65,7 +38,6 @@ class P2C_API UMultiplayerSessionSubsystem
     GENERATED_BODY()
 
 public:
-    UMultiplayerSessionSubsystem();
     virtual void Initialize(FSubsystemCollectionBase& Collection) override;
     virtual void Deinitialize() override;
 
@@ -73,63 +45,47 @@ public:
     void CreateSession(int32 NumPublicConnections);
 
     UFUNCTION(BlueprintCallable, Category = "Multiplayer|Sessions")
-    void FindSessions(int32 MaxSearchResults = 100);
+    void FindSessions(int32 MaxSearchResults);
 
-    UFUNCTION(BlueprintPure,Category = "Multiplayer|Sessions")
-    TArray<FP2CSessionSearchResult> GetCachedSessionResults() const;
+    UFUNCTION(BlueprintCallable, Category = "Multiplayer|Sessions")
+    void JoinSession(int32 CachedResultIndex);
+
+    UFUNCTION(BlueprintCallable, Category = "Multiplayer|Sessions")
+    void LeaveSession();
+
+    UFUNCTION(BlueprintPure, Category = "Multiplayer|Sessions")
+    TArray<FP2CSessionSearchResult>GetCachedSessionResults() const;
 
     UPROPERTY(BlueprintAssignable, Category = "Multiplayer|Sessions")
     FOnCreateSessionCompleted OnCreateSessionCompleted;
 
     UPROPERTY(BlueprintAssignable, Category = "Multiplayer|Sessions")
     FOnFindSessionsCompleted OnFindSessionsCompleted;
-    
-    UFUNCTION(BlueprintCallable, Category = "Multiplayer|Sessions")
-    void JoinSession(int32 CachedResultIndex);
 
     UPROPERTY(BlueprintAssignable, Category = "Multiplayer|Sessions")
     FOnJoinSessionCompleted OnJoinSessionCompleted;
-    
-    UFUNCTION(BlueprintCallable, Category = "Multiplayer|Sessions")
-    void LeaveSession();
 
     UPROPERTY(BlueprintAssignable, Category = "Multiplayer|Sessions")
     FOnLeaveSessionCompleted OnLeaveSessionCompleted;
 
 private:
-    IOnlineSessionPtr GetSessionInterface() const;
+    void HandleOnlineCreateSessionCompleted(bool bWasSuccessful) const;
+    void HandleOnlineFindSessionsCompleted(bool bWasSuccessful, int32 ResultCount) const;
+    void HandleOnlineJoinSessionCompleted(bool bWasSuccessful, const FString& ConnectString) const;
+    void HandleOnlineDestroySessionCompleted(bool bWasSuccessful) const;
+    void HandleConnectionRecoveryRequested() const;
 
-    void HandleCreateSessionComplete(
-        FName SessionName,
-        bool bWasSuccessful);
+    void ReturnToMainMenu() const;
 
-    void HandleFindSessionsComplete(bool bWasSuccessful);
-    
-    void HandleJoinSessionComplete(
-        FName SessionName,
-        EOnJoinSessionCompleteResult::Type Result
-    );
-    
-    void HandleDestroySessionComplete(FName SessionName, bool bWasSuccessful);
-    void HandleConnectionRecoveryRequested();
-    bool ReturnToMainMenu() const;
     bool IsRecoveringFromFailure() const;
+
     UP2CTravelSubsystem* GetTravelSubsystem() const;
 
     UPROPERTY(Transient)
-    TObjectPtr<UP2CConnectionRecoveryService> ConnectionRecoveryService;
-    
-    TSharedPtr<FOnlineSessionSettings> LastSessionSettings;
-    TSharedPtr<FOnlineSessionSearch> LastSessionSearch;
-    TArray<FP2CSessionSearchResult> CachedSessionResults;
+    TObjectPtr<UP2COnlineSessionService>
+        OnlineSessionService;
 
-    FOnCreateSessionCompleteDelegate CreateSessionCompleteDelegate;
-    FOnFindSessionsCompleteDelegate FindSessionsCompleteDelegate;
-    FOnJoinSessionCompleteDelegate JoinSessionCompleteDelegate;
-    FOnDestroySessionCompleteDelegate DestroySessionCompleteDelegate;
-
-    FDelegateHandle CreateSessionCompleteDelegateHandle;
-    FDelegateHandle FindSessionsCompleteDelegateHandle;
-    FDelegateHandle JoinSessionCompleteDelegateHandle;
-    FDelegateHandle DestroySessionCompleteDelegateHandle;
+    UPROPERTY(Transient)
+    TObjectPtr<UP2CConnectionRecoveryService>
+        ConnectionRecoveryService;
 };

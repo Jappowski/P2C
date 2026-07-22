@@ -18,6 +18,7 @@ public:
 	
 	/** Constructor */
 	AP2CGameMode();
+	virtual void PostSeamlessTravel() override;
 };
 
 

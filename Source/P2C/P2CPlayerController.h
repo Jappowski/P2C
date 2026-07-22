@@ -13,11 +13,31 @@ class UUserWidget;
  *  Basic PlayerController class for a third person game
  *  Manages input mappings
  */
-UCLASS(abstract)
+UCLASS()
 class AP2CPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 	
+public:
+	UFUNCTION(BlueprintCallable, Category = "Lobby")
+	void SetLobbyReady(bool bReady);
+	
+	UFUNCTION(BlueprintCallable, Category = "Lobby")
+	void RequestStartMatch();
+
+	/**
+	 * Placeholder function for ui testing
+	 * TODO: Remove it
+	*/
+	UFUNCTION(Exec)
+	void LobbySetReady(bool bReady);
+	
+	/**
+	 *Placeholder function for ui testing
+	 *TODO: Remove it
+	*/
+	UFUNCTION(Exec)
+	void LobbyStartMatch();
 protected:
 
 	/** Input Mapping Contexts */
@@ -49,4 +69,9 @@ protected:
 	/** Returns true if the player should use UMG touch controls */
 	bool ShouldUseTouchControls() const;
 
+	UFUNCTION(Server, Reliable)
+	void ServerSetLobbyReady(bool bReady);
+
+	UFUNCTION(Server, Reliable)
+	void ServerRequestStartMatch();
 };

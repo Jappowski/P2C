@@ -10,9 +10,6 @@ AP2CGameMode::AP2CGameMode()
 {
 	PlayerControllerClass = AP2CPlayerController::StaticClass();
 	PlayerStateClass = AP2CPlayerState::StaticClass();
-
-	// For the future map changes
-	bUseSeamlessTravel = true;
 }
 
 void AP2CGameMode::PostSeamlessTravel()

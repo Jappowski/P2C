@@ -10,11 +10,15 @@
 #include "Lobby/P2CLobbyGameMode.h"
 #include "Player/P2CPlayerState.h"
 #include "Widgets/Input/SVirtualJoystick.h"
+#include "Lobby/P2CLobbyGameState.h"
+#include "UI/Lobby/P2CLobbyWidget.h"
+
 
 void AP2CPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-
+	TryCreateLobbyWidget();
+	
 	// only spawn touch controls on local player controllers
 	if (ShouldUseTouchControls() && IsLocalPlayerController())
 	{
@@ -33,6 +37,90 @@ void AP2CPlayerController::BeginPlay()
 		}
 
 	}
+}
+
+void AP2CPlayerController::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	TryCreateLobbyWidget();
+	if (IsValid(LobbyWidget))
+	{
+		LobbyWidget->RefreshFromCurrentState();
+	}
+}
+
+void AP2CPlayerController::PreClientTravel(const FString& PendingURL, const ETravelType TravelType, const bool bIsSeamlessTravel)
+{
+	RemoveLobbyWidget();
+
+	Super::PreClientTravel(
+		PendingURL,
+		TravelType,
+		bIsSeamlessTravel
+	);
+}
+
+void AP2CPlayerController::TryCreateLobbyWidget()
+{
+	if (!IsLocalController() || IsValid(LobbyWidget))
+	{
+		return;
+	}
+
+	const AP2CLobbyGameState* LobbyGameState = GetWorld()
+			? GetWorld()->GetGameState<AP2CLobbyGameState>()
+			: nullptr;
+
+	if (!IsValid(LobbyGameState))
+	{
+		return;
+	}
+
+	if (!LobbyWidgetClass)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("LobbyWidgetClass is not configured.")
+		);
+
+		return;
+	}
+
+	LobbyWidget = CreateWidget<UP2CLobbyWidget>(this, LobbyWidgetClass);
+
+	if (!IsValid(LobbyWidget))
+	{
+		return;
+	}
+
+	LobbyWidget->AddToPlayerScreen();
+
+	bShowMouseCursor = true;
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetWidgetToFocus(LobbyWidget->TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+
+	SetInputMode(InputMode);
+}
+
+void AP2CPlayerController::RemoveLobbyWidget()
+{
+	if (IsValid(LobbyWidget))
+	{
+		LobbyWidget->RemoveFromParent();
+		LobbyWidget = nullptr;
+	}
+
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	bShowMouseCursor = false;
+	SetInputMode(FInputModeGameOnly());
 }
 
 void AP2CPlayerController::SetupInputComponent()
@@ -64,7 +152,6 @@ void AP2CPlayerController::SetupInputComponent()
 
 bool AP2CPlayerController::ShouldUseTouchControls() const
 {
-	// are we on a mobile platform? Should we force touch?
 	return SVirtualJoystick::ShouldDisplayTouchInterface() || bForceTouchControls;
 }
 

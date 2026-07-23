@@ -5,11 +5,13 @@
 #include "Player/P2CPlayerState.h"
 #include "Map/P2CMapType.h"
 #include "Map/P2CTravelSubsystem.h"
+#include "Lobby/P2CLobbyGameState.h"
 
 AP2CLobbyGameMode::AP2CLobbyGameMode()
 {
 	PlayerControllerClass = AP2CPlayerController::StaticClass();
 	PlayerStateClass = AP2CPlayerState::StaticClass();
+	GameStateClass = AP2CLobbyGameState::StaticClass();
 	
 	DefaultPawnClass = nullptr;
 	bUseSeamlessTravel = true;
@@ -62,6 +64,13 @@ bool AP2CLobbyGameMode::AreAllPlayersReady() const
 	}
 
 	return true;
+}
+
+bool AP2CLobbyGameMode::CanStartMatch() const
+{
+	return HasAuthority()
+		&& !bMatchTravelStarted
+		&& AreAllPlayersReady();
 }
 
 bool AP2CLobbyGameMode::TryStartMatch(

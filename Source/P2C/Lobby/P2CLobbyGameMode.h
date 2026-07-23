@@ -18,6 +18,9 @@ public:
 	 * Called only on the server through the requesting PlayerController.
 	*/
 	bool TryStartMatch(APlayerController* RequestingController);
+	
+	UFUNCTION(BlueprintPure, Category = "Lobby")
+	bool CanStartMatch() const;
 
 	UFUNCTION(BlueprintPure, Category = "Lobby")
 	bool AreAllPlayersReady() const;

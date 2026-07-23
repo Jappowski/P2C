@@ -31,7 +31,7 @@ void AP2CPlayerState::SetReady(const bool bNewReady)
 	}
 
 	bIsReady = bNewReady;
-	
+	OnPlayerDataChanged.Broadcast();
 	OnRep_IsReady();
 	ForceNetUpdate();
 }
@@ -45,8 +45,23 @@ void AP2CPlayerState::OnRep_IsReady()
 		*GetPlayerName(),
 		bIsReady ? TEXT("Ready") : TEXT("Not Ready")
 	);
-
+	OnPlayerDataChanged.Broadcast();
 	OnReadyStateChanged.Broadcast(bIsReady);
+}
+
+void AP2CPlayerState::OnRep_PlayerName()
+{
+	Super::OnRep_PlayerName();
+	
+	OnPlayerDataChanged.Broadcast();
+	
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("Player name replicated. PlayerState: %s, Name: %s"),
+		*GetNameSafe(this),
+		*GetPlayerName()
+	);
 }
 
 void AP2CPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

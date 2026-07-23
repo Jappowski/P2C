@@ -10,6 +10,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	bIsReady
 );
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerDataChanged);
+
 UCLASS()
 class P2C_API AP2CPlayerState : public APlayerState
 {
@@ -25,6 +27,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Lobby")
 	FOnLobbyReadyStateChanged OnReadyStateChanged;
+	
+	UPROPERTY(BlueprintAssignable, Category = "Player")
+	FOnPlayerDataChanged OnPlayerDataChanged;
 
 protected:
 	UPROPERTY(
@@ -36,6 +41,7 @@ protected:
 
 	UFUNCTION()
 	void OnRep_IsReady();
+	virtual void OnRep_PlayerName() override;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void CopyProperties(APlayerState* PlayerState) override;

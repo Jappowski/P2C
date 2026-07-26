@@ -17,30 +17,6 @@ AP2CLobbyGameMode::AP2CLobbyGameMode()
 	bUseSeamlessTravel = true;
 }
 
-void AP2CLobbyGameMode::PostLogin(APlayerController* NewPlayer)
-{
-	Super::PostLogin(NewPlayer);
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("Player joined lobby. Connected players: %d"),
-		GameState ? GameState->PlayerArray.Num() : 0
-	);
-}
-
-void AP2CLobbyGameMode::Logout(AController* ExitingController)
-{
-	Super::Logout(ExitingController);
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("Player left lobby. Connected players: %d"),
-		GameState ? GameState->PlayerArray.Num() : 0
-	);
-}
-
 bool AP2CLobbyGameMode::AreAllPlayersReady() const
 {
 	if (!IsValid(GameState))

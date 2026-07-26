@@ -26,10 +26,6 @@ public:
 	bool AreAllPlayersReady() const;
 
 protected:
-	virtual void PostLogin(APlayerController* NewPlayer) override;
-
-	virtual void Logout(AController* ExitingController) override;
-
 	UPROPERTY(
 		EditDefaultsOnly,
 		BlueprintReadOnly,

@@ -225,7 +225,7 @@ void UMultiplayerSessionSubsystem::HandleOnlineCreateSessionCompleted(const bool
         return;
     }
 
-    if (!TravelSubsystem->ServerTravelToMap(EP2CMapType::Arena, true))
+    if (!TravelSubsystem->ServerTravelToMap(EP2CMapType::Lobby, true))
     {
         UE_LOG(
             LogMultiplayerSessions,

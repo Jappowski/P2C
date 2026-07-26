@@ -21,10 +21,13 @@ public class P2C : ModuleRules
 			"Slate",
 			"OnlineSubsystem",
 			"DeveloperSettings",
+			"UMG"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
-			"OnlineSubsystemUtils"
+			"OnlineSubsystemUtils",
+			"Slate",
+			"SlateCore"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {

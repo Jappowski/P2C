@@ -25,6 +25,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Lobby")
 	void RequestStartMatch();
+	void LobbySetReady(bool bReady);
+	void LobbyStartMatch();
 
 protected:
 	/** Gameplay initialization */

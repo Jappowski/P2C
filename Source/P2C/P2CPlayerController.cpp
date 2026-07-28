@@ -217,13 +217,3 @@ void AP2CPlayerController::ServerRequestStartMatch_Implementation()
 
 	LobbyGameMode->TryStartMatch(this);
 }
-
-void AP2CPlayerController::LobbySetReady(const bool bReady)
-{
-	SetLobbyReady(bReady);
-}
-
-void AP2CPlayerController::LobbyStartMatch()
-{
-	RequestStartMatch();
-}

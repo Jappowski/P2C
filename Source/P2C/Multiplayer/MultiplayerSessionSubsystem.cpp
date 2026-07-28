@@ -204,8 +204,6 @@ void UMultiplayerSessionSubsystem::LeaveSession()
 
 void UMultiplayerSessionSubsystem::HandleOnlineCreateSessionCompleted(const bool bWasSuccessful) const
 {
-    OnCreateSessionCompleted.Broadcast(bWasSuccessful);
-
     if (!bWasSuccessful)
     {
         return;
@@ -233,7 +231,11 @@ void UMultiplayerSessionSubsystem::HandleOnlineCreateSessionCompleted(const bool
             TEXT(
                 "Session was created, but "
                 "ServerTravel failed."));
+        
+        return;
     }
+    
+    OnCreateSessionCompleted.Broadcast(bWasSuccessful);
 }
 
 void UMultiplayerSessionSubsystem::HandleOnlineFindSessionsCompleted(

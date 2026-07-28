@@ -21,7 +21,7 @@ protected:
 
 private:
 	void InitializeArena();
-	void RefreshTemporaryAlivePlayerCount();
+	void RefreshAlivePlayerCount();
 
 	AP2CArenaGameState* GetP2CArenaGameState() const;
 };

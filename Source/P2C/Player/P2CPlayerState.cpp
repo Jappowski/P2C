@@ -7,9 +7,28 @@ AP2CPlayerState::AP2CPlayerState()
 	bReplicates = true;
 }
 
+
+void AP2CPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AP2CPlayerState, bIsReady);
+	DOREPLIFETIME(AP2CPlayerState, MatchPoints);
+	DOREPLIFETIME(AP2CPlayerState, bIsAlive);
+}
+
 bool AP2CPlayerState::IsReady() const
 {
 	return bIsReady;
+}
+
+bool AP2CPlayerState::IsAlive() const
+{
+	return bIsAlive;
+}
+
+int32 AP2CPlayerState::GetMatchPoints() const
+{
+	return MatchPoints;
 }
 
 void AP2CPlayerState::SetReady(const bool bNewReady)
@@ -36,6 +55,81 @@ void AP2CPlayerState::SetReady(const bool bNewReady)
 	ForceNetUpdate();
 }
 
+void AP2CPlayerState::AddMatchPoints(int32 Points)
+{
+	if (!HasAuthority())
+	{
+		ensureMsgf(
+			false,
+			TEXT("AddMatchPoints may only be called by the server.")
+		);
+
+		return;
+	}
+	
+	if (Points == 0)
+	{
+		return;
+	}
+	
+	MatchPoints += Points;
+	
+	OnMatchPointsChanged.Broadcast(MatchPoints);
+	ForceNetUpdate();
+}
+
+void AP2CPlayerState::SetIsAlive(bool bNewIsAlive)
+{
+	if (!HasAuthority())
+	{
+		ensureMsgf(
+			false,
+			TEXT("SetIsAlive may only be called by the server.")
+		);
+	}
+	
+	if (bIsAlive == bNewIsAlive)
+	{
+		return;
+	}
+	
+	bIsAlive = bNewIsAlive;
+	OnAliveStateChanged.Broadcast(bIsAlive);
+	ForceNetUpdate();
+}
+
+void AP2CPlayerState::ResetArenaState()
+{
+	if (!HasAuthority())
+	{
+		ensureMsgf(
+			false,
+			TEXT("ResetArenaState may only be called by the server.")
+		);
+	}
+	
+	const bool bPointsChanged = MatchPoints != 0;
+	const bool bAliveChanged = !bIsAlive;
+	
+	MatchPoints = 0;
+	bIsAlive = true;
+	
+	if (bPointsChanged)
+	{
+		OnMatchPointsChanged.Broadcast(MatchPoints);
+	}
+
+	if (bAliveChanged)
+	{
+		OnAliveStateChanged.Broadcast(bIsAlive);
+	}
+
+	if (bPointsChanged || bAliveChanged)
+	{
+		ForceNetUpdate();
+	}
+}
+
 void AP2CPlayerState::OnRep_IsReady()
 {
 	UE_LOG(
@@ -47,6 +141,16 @@ void AP2CPlayerState::OnRep_IsReady()
 	);
 	OnPlayerDataChanged.Broadcast();
 	OnReadyStateChanged.Broadcast(bIsReady);
+}
+
+void AP2CPlayerState::OnRep_MatchPoints()
+{
+	OnMatchPointsChanged.Broadcast(MatchPoints);
+}
+
+void AP2CPlayerState::OnRep_IsAlive()
+{
+	OnAliveStateChanged.Broadcast(bIsAlive);
 }
 
 void AP2CPlayerState::OnRep_PlayerName()
@@ -62,12 +166,6 @@ void AP2CPlayerState::OnRep_PlayerName()
 		*GetNameSafe(this),
 		*GetPlayerName()
 	);
-}
-
-void AP2CPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AP2CPlayerState, bIsReady);
 }
 
 void AP2CPlayerState::CopyProperties(APlayerState* PlayerState)

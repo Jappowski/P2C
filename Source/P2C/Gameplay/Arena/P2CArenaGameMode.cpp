@@ -25,7 +25,7 @@ void AP2CArenaGameMode::HandleStartingNewPlayer_Implementation(APlayerController
 		return;
 	}
 	
-	RefreshTemporaryAlivePlayerCount();
+	RefreshAlivePlayerCount();
 }
 
 void AP2CArenaGameMode::BeginPlay()
@@ -55,8 +55,19 @@ void AP2CArenaGameMode::InitializeArena()
 		return;
 	}
 	
+	for (APlayerState* BasePlayerState : ArenaGameState->PlayerArray)
+	{
+		AP2CPlayerState* P2CPlayerState =
+			Cast<AP2CPlayerState>(BasePlayerState);
+
+		if (IsValid(P2CPlayerState))
+		{
+			P2CPlayerState->ResetArenaState();
+		}
+	}
+	
 	ArenaGameState->SetArenaPhase(EP2CArenaPhase::Preparing);
-	RefreshTemporaryAlivePlayerCount();
+	RefreshAlivePlayerCount();
 	
 	UE_LOG(
 		LogP2CArena,
@@ -66,16 +77,25 @@ void AP2CArenaGameMode::InitializeArena()
 	)
 }
 
-void AP2CArenaGameMode::RefreshTemporaryAlivePlayerCount()
+void AP2CArenaGameMode::RefreshAlivePlayerCount()
 {
 	AP2CArenaGameState* ArenaGameState = GetP2CArenaGameState();
 	if (!IsValid(ArenaGameState))
 	{
 		return;
 	}
-	// TODO: change it to count isAlive when available
-	const int32 ConnectedPlayerCount = ArenaGameState->PlayerArray.Num();
-	ArenaGameState->SetAlivePlayerCount(ConnectedPlayerCount);
+
+	int32 AlivePlayers = 0;
+	for (const auto& PlayerState : ArenaGameState->PlayerArray)
+	{
+		const AP2CPlayerState* P2CPlayerState = Cast<AP2CPlayerState>(PlayerState);
+		if (IsValid(P2CPlayerState) && P2CPlayerState->IsAlive())
+		{
+			++AlivePlayers;
+		}
+	}
+	
+	ArenaGameState->SetAlivePlayerCount(AlivePlayers);
 }
 
 AP2CArenaGameState* AP2CArenaGameMode::GetP2CArenaGameState() const

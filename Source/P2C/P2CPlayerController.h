@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerController.h"
 #include "P2CPlayerController.generated.h"
 
+class UP2CArenaHUDWidget;
 class UInputMappingContext;
 class UUserWidget;
 class UP2CLobbyWidget;
@@ -62,6 +63,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI"
 	)
 	TSubclassOf<UP2CLobbyWidget> LobbyWidgetClass;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<UP2CArenaHUDWidget> ArenaHUDWidgetClass;
 
 	/** Returns true if the player should use UMG touch controls. */
 	bool ShouldUseTouchControls() const;
@@ -71,11 +75,20 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void ServerRequestStartMatch();
+	
+	virtual void OnPossess(APawn* InPawn) override;
+	virtual void OnRep_Pawn() override;
 
 private:
 	UPROPERTY()
 	TObjectPtr<UP2CLobbyWidget> LobbyWidget;
+	
+	UPROPERTY()
+	TObjectPtr<UP2CArenaHUDWidget> ArenaHUDWidget;
 
 	void TryCreateLobbyWidget();
 	void RemoveLobbyWidget();
+	
+	void TryCreateArenaHUDWidget();
+	void RemoveArenaHUDWidget();
 };

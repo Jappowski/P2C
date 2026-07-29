@@ -12,12 +12,15 @@
 #include "Widgets/Input/SVirtualJoystick.h"
 #include "Lobby/P2CLobbyGameState.h"
 #include "UI/Lobby/P2CLobbyWidget.h"
+#include "Gameplay/Arena/P2CArenaGameState.h"
+#include "UI/Arena/ArenaHUDWidget.h"
 
 
 void AP2CPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	TryCreateLobbyWidget();
+	TryCreateArenaHUDWidget();
 	
 	// only spawn touch controls on local player controllers
 	if (ShouldUseTouchControls() && IsLocalPlayerController())
@@ -48,12 +51,20 @@ void AP2CPlayerController::OnRep_PlayerState()
 	{
 		LobbyWidget->RefreshFromCurrentState();
 	}
+	
+	TryCreateArenaHUDWidget();
+
+	if (IsValid(ArenaHUDWidget))
+	{
+		ArenaHUDWidget->BindToGameplaySources();
+	}
 }
 
 void AP2CPlayerController::PreClientTravel(const FString& PendingURL, const ETravelType TravelType, const bool bIsSeamlessTravel)
 {
 	RemoveLobbyWidget();
-
+	RemoveArenaHUDWidget();
+	
 	Super::PreClientTravel(
 		PendingURL,
 		TravelType,
@@ -123,6 +134,55 @@ void AP2CPlayerController::RemoveLobbyWidget()
 	SetInputMode(FInputModeGameOnly());
 }
 
+void AP2CPlayerController::TryCreateArenaHUDWidget()
+{
+	if (!IsLocalController() || IsValid(ArenaHUDWidget))
+	{
+		return;
+	}
+	
+	const AP2CArenaGameState* ArenaGameState = GetWorld()
+			? GetWorld()->GetGameState<AP2CArenaGameState>()
+			: nullptr;
+	
+	if (!IsValid(ArenaGameState))
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("ArenaHUDWidgetClass is not configured.")
+		);
+		
+		return;
+	}
+	
+	ArenaHUDWidget = CreateWidget<UP2CArenaHUDWidget>(
+		this,
+		ArenaHUDWidgetClass
+	);
+	
+	if (!IsValid(ArenaHUDWidget))
+	{
+		return;
+	}
+
+	ArenaHUDWidget->AddToPlayerScreen();
+
+	bShowMouseCursor = false;
+	SetInputMode(FInputModeGameOnly());
+}
+
+void AP2CPlayerController::RemoveArenaHUDWidget()
+{
+	if (!IsValid(ArenaHUDWidget))
+	{
+		return;
+	}
+	
+	ArenaHUDWidget->RemoveFromParent();
+	ArenaHUDWidget = nullptr;
+}
+
 void AP2CPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -153,6 +213,32 @@ void AP2CPlayerController::SetupInputComponent()
 bool AP2CPlayerController::ShouldUseTouchControls() const
 {
 	return SVirtualJoystick::ShouldDisplayTouchInterface() || bForceTouchControls;
+}
+
+// for the server and local host
+void AP2CPlayerController::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+	
+	TryCreateArenaHUDWidget();
+	
+	if (IsValid(ArenaHUDWidget))
+	{
+		ArenaHUDWidget->BindToGameplaySources();
+	}
+}
+
+// for client
+void AP2CPlayerController::OnRep_Pawn()
+{
+	Super::OnRep_Pawn();
+
+	TryCreateArenaHUDWidget();
+
+	if (IsValid(ArenaHUDWidget))
+	{
+		ArenaHUDWidget->BindToGameplaySources();
+	}
 }
 
 void AP2CPlayerController::SetLobbyReady(const bool bReady)

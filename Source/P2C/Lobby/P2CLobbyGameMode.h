@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "Gameplay/P2CGameRules.h"
 #include "P2CLobbyGameMode.generated.h"
 
 class APlayerController;
@@ -32,7 +33,7 @@ protected:
 		Category = "Lobby",
 		meta = (ClampMin = "1")
 	)
-	int32 MinimumPlayersToStart = 2;
+	int32 MinimumPlayersToStart = P2CGameRules::MinimumPlayersToStart;;
 
 private:
 	bool IsHostController(

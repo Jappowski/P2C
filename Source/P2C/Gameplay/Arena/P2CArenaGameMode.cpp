@@ -1,7 +1,12 @@
 ﻿#include "P2CArenaGameMode.h"
 
 #include "P2CArenaGameState.h"
+#include "P2CCharacter.h"
 #include "P2CPlayerController.h"
+#include "Bomb/P2CBomb.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PawnMovementComponent.h"
+#include "Gameplay/P2CGameRules.h"
 #include "Player/P2CPlayerState.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogP2CArena, Log, All);
@@ -24,7 +29,13 @@ void AP2CArenaGameMode::HandleStartingNewPlayer_Implementation(APlayerController
 		return;
 	}
 	
+	if (AP2CCharacter* Character = Cast<AP2CCharacter>(NewPlayer->GetPawn()))
+	{
+		SetCharacterMovementEnabled(Character, false);
+	}
+
 	RefreshAlivePlayerCount();
+	TryStartPreparation();
 }
 
 void AP2CArenaGameMode::BeginPlay()
@@ -37,6 +48,149 @@ void AP2CArenaGameMode::BeginPlay()
 	}
 	
 	InitializeArena();
+}
+
+void AP2CArenaGameMode::TryStartPreparation()
+{
+	if (bPreparationStarted || IsValid(ActiveBomb))
+	{
+		return;
+	}
+	AP2CCharacter* InitialHolder = ChooseRandomAliveCharacter();
+
+	if (!IsValid(InitialHolder))
+	{
+		return;
+	}
+	
+	StartPreparation(InitialHolder);
+}
+
+void AP2CArenaGameMode::StartPreparation(AP2CCharacter* InitialHolder)
+{
+	if (bPreparationStarted || !BombClass)
+	{
+		return;
+	}
+	
+	bPreparationStarted = true;
+	SetAllPlayerMovementEnabled(false);
+	
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	ActiveBomb = GetWorld()->SpawnActor<AP2CBomb>(BombClass,
+		InitialHolder->GetActorLocation(),
+		FRotator::ZeroRotator,
+		SpawnParameters);
+	
+	if (!IsValid(ActiveBomb))
+	{
+		bPreparationStarted = false;
+		UE_LOG(LogTemp, Error, TEXT("Failed to spawn arena bomb."));
+		return;
+	}
+	
+	ActiveBomb->AssignToHolder(InitialHolder);
+	if (AP2CArenaGameState* ArenaGameState = GetGameState<AP2CArenaGameState>())
+	{
+		ArenaGameState->SetArenaPhase(EP2CArenaPhase::Preparing);
+	}
+	
+	GetWorldTimerManager().SetTimer(
+		PreparationTimerHandle,
+		this,
+		&ThisClass::ActiveBombRound, 
+		PreparationDuration,
+		false
+		);
+}
+
+void AP2CArenaGameMode::ActiveBombRound()
+{
+	if (!IsValid(ActiveBomb))
+	{
+		return;
+	}
+	
+	SetAllPlayerMovementEnabled(true);
+	if (AP2CArenaGameState* ArenaGameState = GetGameState<AP2CArenaGameState>())
+	{
+		ArenaGameState->SetArenaPhase(EP2CArenaPhase::BombActive);
+	}
+	
+	UE_LOG(LogTemp, Log, TEXT("Round started"));
+}
+
+void AP2CArenaGameMode::SetAllPlayerMovementEnabled(bool bEnabled)
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World))
+	{
+		return;
+	}
+	
+	for (FConstPlayerControllerIterator Iterator = World->GetPlayerControllerIterator(); Iterator; ++Iterator)
+	{
+		APlayerController* PlayerController = Iterator->Get();
+		if (!IsValid(PlayerController))
+		{
+			continue;
+		}
+		
+		SetCharacterMovementEnabled(Cast<AP2CCharacter>(PlayerController->GetPawn()), bEnabled);
+	}
+}
+
+void AP2CArenaGameMode::SetCharacterMovementEnabled(AP2CCharacter* Character, bool bEnabled)
+{
+	if (!IsValid(Character))
+	{
+		return;
+	}
+	
+	UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement();
+	if (!IsValid(MovementComponent))
+	{
+		return;
+	}
+	
+	MovementComponent->SetMovementMode(bEnabled ? MOVE_Walking : MOVE_None);
+}
+
+AP2CCharacter* AP2CArenaGameMode::ChooseRandomAliveCharacter()
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World))
+	{
+		return nullptr;
+	}
+	
+	TArray<AP2CCharacter*> Candidates;
+	for (FConstPlayerControllerIterator Iterator = World->GetPlayerControllerIterator(); Iterator; ++Iterator)
+	{
+		APlayerController* PlayerController = Iterator->Get();
+		if (!IsValid(PlayerController))
+		{
+			continue;
+		}
+		AP2CPlayerState* PlayerState = PlayerController->GetPlayerState<AP2CPlayerState>();
+		AP2CCharacter* Character = Cast<AP2CCharacter>(PlayerController->GetPawn());
+		if (!IsValid(PlayerState) || !PlayerState->IsAlive() || !IsValid(Character))
+		{
+			continue;
+		}
+		
+		Candidates.Add(Character);
+	}
+	
+	if (Candidates.Num() < P2CGameRules::MinimumPlayersToStart)
+	{
+		return nullptr;
+	}
+	
+	const int32 RandomIndex = FMath::RandHelper(Candidates.Num());
+
+	return Candidates[RandomIndex];
 }
 
 void AP2CArenaGameMode::InitializeArena()

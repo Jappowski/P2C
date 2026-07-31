@@ -1,10 +1,7 @@
 ﻿#include "P2CBomb.h"
 
-#include "EngineUtils.h"
 #include "P2CCharacter.h"
-#include "Projects.h"
 #include "Chaos/AABBTree.h"
-#include "Components/CapsuleComponent.h"
 #include "Components/SphereComponent.h"
 #include "Gameplay/Arena/P2CArenaGameMode.h"
 #include "Net/UnrealNetwork.h"

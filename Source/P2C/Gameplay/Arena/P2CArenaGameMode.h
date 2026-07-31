@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "P2CGameMode.h"
+#include "P2CPlayerController.h"
 #include "P2CArenaGameMode.generated.h"
 
 class AP2CCharacter;
@@ -17,6 +18,8 @@ class P2C_API AP2CArenaGameMode : public AP2CGameMode
 public:
 	AP2CArenaGameMode();
 	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
+	bool TryThrowBomb(AP2CPlayerController* RequestingController) const;
+	bool TryPassBombToCharacter(AP2CBomb* Bomb,AP2CCharacter* TargetCharacter) const;
 
 protected:
 	virtual void BeginPlay() override;

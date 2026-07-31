@@ -10,6 +10,7 @@ class UP2CArenaHUDWidget;
 class UInputMappingContext;
 class UUserWidget;
 class UP2CLobbyWidget;
+class UInputAction;
 
 /**
  * Basic PlayerController class for a third person game.
@@ -66,6 +67,13 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
 	TSubclassOf<UP2CArenaHUDWidget> ArenaHUDWidgetClass;
+	
+	UPROPERTY(
+	EditDefaultsOnly,
+	BlueprintReadOnly,
+	Category = "P2C|Input"
+	)
+	TObjectPtr<UInputAction> ThrowBombAction;
 
 	/** Returns true if the player should use UMG touch controls. */
 	bool ShouldUseTouchControls() const;
@@ -91,4 +99,9 @@ private:
 	
 	void TryCreateArenaHUDWidget();
 	void RemoveArenaHUDWidget();
+	
+	void HandleThrowBombInput();
+	
+	UFUNCTION(Server, Reliable)
+	void ServerRequestThrowBomb();
 };

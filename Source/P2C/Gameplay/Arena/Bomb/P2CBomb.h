@@ -2,11 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/ProjectileMovementComponent.h"
 #include "P2CBomb.generated.h"
 
 class AP2CCharacter;
 class USphereComponent;
 class UStaticMeshComponent;
+class UPrimitiveComponent;
 
 UENUM(BlueprintType)
 enum class EP2CBombState : uint8
@@ -42,19 +44,40 @@ public:
 	bool IsHeldBy(const AP2CCharacter* Character) const;
 
 	/**
-	 * Server-only.
+	 * Server-only
 	 */
 	void AssignToHolder(AP2CCharacter* NewHolder);
+	
+	/**
+	* Server-only
+	* Returns true, when bomb is thrown correctly
+	*/
+	bool LaunchFromHolder(const FVector& Direction);
 
 	UPROPERTY(BlueprintAssignable, Category = "P2C|Bomb")
 	FP2CBombHolderChangedSignature OnBombHolderChanged;
 	
 protected:
+	virtual void BeginPlay() override;
+	
 	UFUNCTION()
 	void OnRep_CurrentHolder();
 	
 	UFUNCTION()
 	void OnRep_BombState();
+	
+	UFUNCTION()
+	void HandleProjectileStop(const FHitResult& ImpactResult);
+	
+	UFUNCTION()
+	void HandleBombOverlap(
+		UPrimitiveComponent* OverlappedComponent,
+		AActor* OtherActor,
+		UPrimitiveComponent* OtherComponent,
+		int32 OtherBodyIndex,
+		bool bFromSweep,
+		const FHitResult& SweepResult
+	);
 	
 	void AttachToCurrentHolder();
 	void ApplyStatePresentation();
@@ -76,9 +99,27 @@ protected:
 	)
 	TObjectPtr<AP2CCharacter> CurrentHolder;
 	
-	UPROPERTY(ReplicatedUsing = OnRep_CurrentHolder,
+	UPROPERTY(Transient)
+	TObjectPtr<AP2CCharacter> LastHolder;
+	
+	UPROPERTY(ReplicatedUsing = OnRep_BombState,
 		VisibleInstanceOnly, 
 		BlueprintReadOnly,
 		Category = "P2C|Bomb")
 	EP2CBombState BombState = EP2CBombState::Attached;
+	
+	UPROPERTY(
+	VisibleAnywhere,
+	BlueprintReadOnly,
+	Category = "P2C|Bomb"
+	)
+	TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
+	
+	UPROPERTY(
+	EditDefaultsOnly,
+	BlueprintReadOnly,
+	Category = "P2C|Bomb",
+	meta = (ClampMin = "1.0")
+	)
+	float ThrowSpeed = 1800.0f;
 };

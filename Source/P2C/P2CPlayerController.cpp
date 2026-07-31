@@ -2,11 +2,14 @@
 
 
 #include "P2CPlayerController.h"
+
+#include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
 #include "Blueprint/UserWidget.h"
 #include "P2C.h"
+#include "Gameplay/Arena/P2CArenaGameMode.h"
 #include "Lobby/P2CLobbyGameMode.h"
 #include "Player/P2CPlayerState.h"
 #include "Widgets/Input/SVirtualJoystick.h"
@@ -183,6 +186,30 @@ void AP2CPlayerController::RemoveArenaHUDWidget()
 	ArenaHUDWidget = nullptr;
 }
 
+void AP2CPlayerController::HandleThrowBombInput()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+	
+	ServerRequestThrowBomb();
+}
+
+void AP2CPlayerController::ServerRequestThrowBomb_Implementation()
+{
+	AP2CArenaGameMode* ArenaGameMode = GetWorld() 
+	? GetWorld()->GetAuthGameMode<AP2CArenaGameMode>()
+	: nullptr;
+	
+	if (!IsValid(ArenaGameMode))
+	{
+		return;
+	}
+
+	ArenaGameMode->TryThrowBomb(this);
+}
+
 void AP2CPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -207,6 +234,40 @@ void AP2CPlayerController::SetupInputComponent()
 				}
 			}
 		}
+		
+		UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
+		
+		if (!IsValid(EnhancedInputComponent))
+		{
+			UE_LOG(
+				LogTemp,
+				Error,
+				TEXT(
+					"P2CPlayerController requires "
+					"UEnhancedInputComponent."
+				)
+			);
+
+			return;
+		}
+		
+		if (!IsValid(ThrowBombAction))
+		{
+			UE_LOG(
+				LogTemp,
+				Warning,
+				TEXT("ThrowBombAction is not configured.")
+			);
+
+			return;
+		}
+		
+		EnhancedInputComponent->BindAction(
+		ThrowBombAction,
+		ETriggerEvent::Started,
+		this,
+		&ThisClass::HandleThrowBombInput
+	);
 	}
 }
 

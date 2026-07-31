@@ -38,6 +38,58 @@ void AP2CArenaGameMode::HandleStartingNewPlayer_Implementation(APlayerController
 	TryStartPreparation();
 }
 
+bool AP2CArenaGameMode::TryThrowBomb(AP2CPlayerController* RequestingController) const
+{
+	if (!HasAuthority() || !IsValid(RequestingController) || !IsValid(ActiveBomb))
+	{
+		return false;
+	}
+	
+	AP2CArenaGameState* ArenaGameState = GetP2CArenaGameState();
+	if (!IsValid(ArenaGameState) || ArenaGameState->GetArenaPhase() != EP2CArenaPhase::BombActive)
+	{
+		return false;
+	}
+	
+	AP2CCharacter* Thrower = Cast<AP2CCharacter>(RequestingController->GetPawn());
+	AP2CPlayerState* ThrowerState = Cast<AP2CPlayerState>(Thrower->GetPlayerState());
+	
+	if (!IsValid(Thrower) || !IsValid(ThrowerState) || !ThrowerState->IsAlive())
+	{
+		return false;
+	}
+	
+	if (!ActiveBomb->IsHeldBy(Thrower))
+	{
+		return false;
+	}
+	
+	return ActiveBomb->LaunchFromHolder(Thrower->GetActorForwardVector());
+}
+
+bool AP2CArenaGameMode::TryPassBombToCharacter(AP2CBomb* Bomb, AP2CCharacter* TargetCharacter) const
+{
+	if (!HasAuthority() || !IsValid(Bomb) || Bomb != ActiveBomb || !IsValid(TargetCharacter))
+	{
+		return false;
+	}
+	
+	AP2CArenaGameState* ArenaGameState = GetGameState<AP2CArenaGameState>();
+	if (!IsValid(ArenaGameState) || ArenaGameState->GetArenaPhase() != EP2CArenaPhase::BombActive)
+	{
+		return false;
+	}
+	
+	AP2CPlayerState* TargetPlayerState = TargetCharacter->GetPlayerState<AP2CPlayerState>();
+	if (!IsValid(TargetPlayerState) || !TargetPlayerState->IsAlive())
+	{
+		return false;
+	}
+	
+	Bomb->AssignToHolder(TargetCharacter);
+	return true;
+}
+
 void AP2CArenaGameMode::BeginPlay()
 {
 	Super::BeginPlay();

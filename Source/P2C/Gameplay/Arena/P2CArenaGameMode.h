@@ -43,6 +43,22 @@ protected:
 	)
 	float MaximumBombFuseDuration = 30.0f;
 	
+	UPROPERTY(
+	EditDefaultsOnly,
+	BlueprintReadOnly,
+	Category = "P2C|Arena",
+	meta = (ClampMin = "0.0")
+	)
+	float ExplosionResolutionDuration = 2.0f;
+	
+	UPROPERTY(
+	EditDefaultsOnly,
+	BlueprintReadOnly,
+	Category = "P2C|Arena",
+	meta = (ClampMin = "0.0")
+	)
+	float RoundEndDuration = 3.0f;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "P2C|Bomb")
 	TSubclassOf<AP2CBomb> BombClass;
 
@@ -53,7 +69,8 @@ private:
 	bool bPreparationStarted = false;
 	FTimerHandle PreparationTimerHandle;
 	FTimerHandle BombFuseTimerHandle;
-
+	FTimerHandle NextBombCycleTimerHandle;
+	FTimerHandle ReturnToLobbyTimerHandle;
 	
 	void TryStartPreparation();
 	void StartPreparation(AP2CCharacter* InitialHolder);
@@ -70,4 +87,10 @@ private:
 	void StartBombFuse();
 	void HandleBombFuseExpired();
 	void EliminateCharacter(AP2CCharacter* Character);
+	
+	void ResolveExplosion();
+	void StartNextBombCycle();
+	void ResetAlivePlayersForNextCycle();
+	void EndArenaRound();
+	void ReturnToLobby();
 };

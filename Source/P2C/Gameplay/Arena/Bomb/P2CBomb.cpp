@@ -2,6 +2,7 @@
 
 #include "P2CCharacter.h"
 #include "Chaos/AABBTree.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/SphereComponent.h"
 #include "Gameplay/Arena/P2CArenaGameMode.h"
 #include "Net/UnrealNetwork.h"
@@ -65,7 +66,9 @@ void AP2CBomb::AssignToHolder(AP2CCharacter* NewHolder)
 	}
 	
 	LastHolder = nullptr;
-	
+
+	ProjectileMovement->bIsHomingProjectile = false;
+	ProjectileMovement->HomingTargetComponent.Reset();
 	ProjectileMovement->StopMovementImmediately();
 	ProjectileMovement->Deactivate();
 	
@@ -182,7 +185,11 @@ void AP2CBomb::HandleProjectileStop(const FHitResult& ImpactResult)
 		return;
 	}
 
-	BeginReturn();
+	GetWorldTimerManager().ClearTimer(FlightTimeoutHandle);
+	GetWorldTimerManager().SetTimerForNextTick(
+		this,
+		&ThisClass::BeginReturn
+		);
 }
 
 void AP2CBomb::HandleBombOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
@@ -270,12 +277,23 @@ void AP2CBomb::ApplyStatePresentation()
 		CollisionComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		break;
 	case EP2CBombState::Flying:
+		CollisionComponent->SetCollisionResponseToChannel(
+			ECC_WorldStatic,
+			ECR_Block
+		);
+		
 		CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 		CollisionComponent->SetGenerateOverlapEvents(true);
 		break;
 	case EP2CBombState::Returning:
+		CollisionComponent->SetCollisionResponseToChannel(
+			ECC_WorldStatic,
+			ECR_Ignore
+		);
+
 		CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 		CollisionComponent->SetGenerateOverlapEvents(true);
+		break;
 	case EP2CBombState::Exploded:
 		default:
 		CollisionComponent->SetGenerateOverlapEvents(false);
@@ -298,28 +316,38 @@ void AP2CBomb::BeginReturn()
 		return;
 	}
 	
-	USceneComponent* ReturnTarget = LastHolder->GetRootComponent();
+	USceneComponent* ReturnTarget = LastHolder->GetCapsuleComponent();
 	if (!IsValid(ReturnTarget))
 	{
 		return;
 	}
+	
+	CollisionComponent->IgnoreActorWhenMoving(
+		LastHolder,
+		false
+	);
+
 	
 	BombState = EP2CBombState::Returning;
 	ApplyStatePresentation();
 	
 	ProjectileMovement->Deactivate();
 	ProjectileMovement->StopMovementImmediately();
+	ProjectileMovement->SetUpdatedComponent(
+		CollisionComponent
+	);
 	
 	ProjectileMovement->HomingTargetComponent =
 		ReturnTarget;
 
 	ProjectileMovement->bIsHomingProjectile = true;
 
-	const FVector ReturnDirection = LastHolder->GetActorLocation() - GetActorLocation().GetSafeNormal();
+	const FVector ReturnDirection = (LastHolder->GetActorLocation() - GetActorLocation()).GetSafeNormal();
 	
 	ProjectileMovement->Velocity =
 		ReturnDirection * ThrowSpeed;
 
+	UE_LOG(LogTemp, Warning, TEXT("BOMB IS RETURNING"));
 	ProjectileMovement->Activate(true);
 	ProjectileMovement->UpdateComponentVelocity();
 

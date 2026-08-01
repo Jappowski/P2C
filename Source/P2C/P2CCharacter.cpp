@@ -11,6 +11,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "P2C.h"
+#include "Player/Components/P2CPlayerStatsComponent.h"
 
 AP2CCharacter::AP2CCharacter()
 {
@@ -45,9 +46,31 @@ AP2CCharacter::AP2CCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
+	
+	PlayerStatsComponent = 
+		CreateDefaultSubobject<UP2CPlayerStatsComponent>(TEXT("PlayerStatsComponent"));
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+}
+
+UP2CPlayerStatsComponent* AP2CCharacter::GetPlayerStatsComponent() const
+{
+	return PlayerStatsComponent;
+}
+
+float AP2CCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator,
+	AActor* DamageCauser)
+{
+	const float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	
+	if (!HasAuthority() || !IsValid(PlayerStatsComponent) || ActualDamage <= 0.0f)
+	{
+		return 0.0f;
+	}
+	
+	PlayerStatsComponent->ApplyDamage(ActualDamage);
+	return ActualDamage;
 }
 
 void AP2CCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

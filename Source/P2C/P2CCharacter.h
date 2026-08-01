@@ -11,6 +11,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 struct FInputActionValue;
+class UP2CPlayerStatsComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -48,11 +49,28 @@ protected:
 	/** Mouse Look Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
+	
+	UPROPERTY(
+	VisibleAnywhere,
+	BlueprintReadOnly,
+	Category = "P2C|Stats",
+	meta = (AllowPrivateAccess = "true")
+)
+	TObjectPtr<UP2CPlayerStatsComponent> PlayerStatsComponent;
 
 public:
 
 	/** Constructor */
 	AP2CCharacter();	
+	
+	UFUNCTION(BlueprintPure, Category = "P2C|Stats")
+	UP2CPlayerStatsComponent* GetPlayerStatsComponent() const;
+
+	virtual float TakeDamage(
+	float DamageAmount,
+	const FDamageEvent& DamageEvent,
+	AController* EventInstigator,
+	AActor* DamageCauser) override;
 
 protected:
 

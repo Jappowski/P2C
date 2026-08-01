@@ -122,4 +122,18 @@ protected:
 	meta = (ClampMin = "1.0")
 	)
 	float ThrowSpeed = 1800.0f;
+	
+	UPROPERTY(
+	EditDefaultsOnly,
+	BlueprintReadOnly,
+	Category = "P2C|Bomb",
+	meta = (ClampMin = "0.1")
+	)
+	float FlightDuration = 1.25f;
+	
+private:
+	void BeginReturn();
+	void HandleFlightTimeout();
+	
+	FTimerHandle FlightTimeoutHandle;
 };

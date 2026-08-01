@@ -15,7 +15,7 @@ AP2CArenaGameMode::AP2CArenaGameMode()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	
-	GameStateClass = AP2CArenaGameMode::StaticClass();
+	GameStateClass = AP2CArenaGameState::StaticClass();
 	PlayerStateClass = AP2CPlayerState::StaticClass();
 	PlayerControllerClass = AP2CPlayerController::StaticClass();
 }
@@ -52,9 +52,14 @@ bool AP2CArenaGameMode::TryThrowBomb(AP2CPlayerController* RequestingController)
 	}
 	
 	AP2CCharacter* Thrower = Cast<AP2CCharacter>(RequestingController->GetPawn());
-	AP2CPlayerState* ThrowerState = Cast<AP2CPlayerState>(Thrower->GetPlayerState());
 	
-	if (!IsValid(Thrower) || !IsValid(ThrowerState) || !ThrowerState->IsAlive())
+	if (!IsValid(Thrower))
+	{
+		return false;
+	}
+	
+	AP2CPlayerState* ThrowerState = Cast<AP2CPlayerState>(Thrower->GetPlayerState());
+	if (!IsValid(ThrowerState) || !ThrowerState->IsAlive())
 	{
 		return false;
 	}

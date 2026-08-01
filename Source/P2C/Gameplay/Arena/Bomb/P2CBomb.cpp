@@ -64,11 +64,6 @@ void AP2CBomb::AssignToHolder(AP2CCharacter* NewHolder)
 		return;
 	}
 	
-	if (IsValid(LastHolder))
-	{
-		CollisionComponent->IgnoreActorWhenMoving(LastHolder, false);
-	}
-	
 	LastHolder = nullptr;
 	
 	ProjectileMovement->StopMovementImmediately();
@@ -76,6 +71,7 @@ void AP2CBomb::AssignToHolder(AP2CCharacter* NewHolder)
 	
 	CurrentHolder = NewHolder;
 	BombState = EP2CBombState::Attached;
+	GetWorldTimerManager().ClearTimer(FlightTimeoutHandle);
 	// sets for network
 	SetOwner(NewHolder);
 	
@@ -88,11 +84,7 @@ void AP2CBomb::AssignToHolder(AP2CCharacter* NewHolder)
 
 bool AP2CBomb::LaunchFromHolder(const FVector& Direction)
 {
-	if (
-		!HasAuthority() ||
-		BombState != EP2CBombState::Attached ||
-		!IsValid(CurrentHolder)
-	)
+	if (!HasAuthority() || BombState != EP2CBombState::Attached || !IsValid(CurrentHolder))
 	{
 		return false;
 	}
@@ -105,6 +97,10 @@ bool AP2CBomb::LaunchFromHolder(const FVector& Direction)
 	}
 
 	LastHolder = CurrentHolder;
+	CollisionComponent->IgnoreActorWhenMoving(
+		LastHolder,
+		true
+	);
 
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
@@ -117,9 +113,27 @@ bool AP2CBomb::LaunchFromHolder(const FVector& Direction)
 	ProjectileMovement->Velocity = NormalizedDirection * ThrowSpeed;
 	ProjectileMovement->Activate(true);
 	ProjectileMovement->UpdateComponentVelocity();
+	
+	
+	UE_LOG(
+	LogTemp,
+	Warning,
+	TEXT("Launch bomb. Holder=%s Location=%s Direction=%s"),
+	*GetNameSafe(CurrentHolder),
+	*GetActorLocation().ToString(),
+	*NormalizedDirection.ToString()
+);
+	
+	GetWorldTimerManager().SetTimer(
+		FlightTimeoutHandle,
+		this,
+		&ThisClass::HandleFlightTimeout,
+		FlightDuration,
+		false
+	);
+
 
 	OnBombHolderChanged.Broadcast(nullptr);
-
 	ForceNetUpdate();
 
 	return true;
@@ -129,12 +143,22 @@ void AP2CBomb::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	CollisionComponent->OnComponentBeginOverlap.RemoveDynamic(
+		this,
+		&ThisClass::HandleBombOverlap
+	);
+
 	CollisionComponent->OnComponentBeginOverlap.AddUniqueDynamic(
 		this,
 		&ThisClass::HandleBombOverlap
 	);
-	
-	ProjectileMovement->OnProjectileStop.AddDynamic(
+
+	ProjectileMovement->OnProjectileStop.RemoveDynamic(
+		this,
+		&ThisClass::HandleProjectileStop
+	);
+
+	ProjectileMovement->OnProjectileStop.AddUniqueDynamic(
 		this,
 		&ThisClass::HandleProjectileStop
 	);
@@ -153,20 +177,54 @@ void AP2CBomb::OnRep_BombState()
 
 void AP2CBomb::HandleProjectileStop(const FHitResult& ImpactResult)
 {
-	UE_LOG(LogTemp, Error, TEXT("PROJECTILE STOP"));
+	if (!HasAuthority() || BombState != EP2CBombState::Flying)
+	{
+		return;
+	}
+
+	BeginReturn();
 }
 
 void AP2CBomb::HandleBombOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
 	UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (!HasAuthority() || BombState != EP2CBombState::Flying)
+	if (!HasAuthority())
+	{
+		return;
+	}
+	
+	if (BombState != EP2CBombState::Flying && BombState != EP2CBombState::Returning)
 	{
 		return;
 	}
 
 	AP2CCharacter* HitCharacter =Cast<AP2CCharacter>(OtherActor);
 
-	if (!IsValid(HitCharacter) || HitCharacter == LastHolder)
+	if (!IsValid(HitCharacter))
+	{
+		return;
+	}
+	
+	switch (BombState) {
+	case EP2CBombState::Flying:
+		if (HitCharacter == LastHolder)
+		{
+			return;
+		}
+		break;
+
+	case EP2CBombState::Returning:
+		if (HitCharacter != LastHolder)
+		{
+			return;
+		}
+		break;
+
+	default:
+		return;
+	}
+	
+	if (BombState == EP2CBombState::Returning && HitCharacter != LastHolder)
 	{
 		return;
 	}
@@ -216,10 +274,64 @@ void AP2CBomb::ApplyStatePresentation()
 		CollisionComponent->SetGenerateOverlapEvents(true);
 		break;
 	case EP2CBombState::Returning:
+		CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		CollisionComponent->SetGenerateOverlapEvents(true);
 	case EP2CBombState::Exploded:
 		default:
 		CollisionComponent->SetGenerateOverlapEvents(false);
 		CollisionComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		break;
 	}
+}
+
+void AP2CBomb::BeginReturn()
+{
+	if (!HasAuthority() || BombState != EP2CBombState::Flying)
+	{
+		return;
+	}
+	
+	GetWorldTimerManager().ClearTimer(FlightTimeoutHandle);
+	if (!IsValid(LastHolder))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cannot return bomb: LastHolder is invalid"))
+		return;
+	}
+	
+	USceneComponent* ReturnTarget = LastHolder->GetRootComponent();
+	if (!IsValid(ReturnTarget))
+	{
+		return;
+	}
+	
+	BombState = EP2CBombState::Returning;
+	ApplyStatePresentation();
+	
+	ProjectileMovement->Deactivate();
+	ProjectileMovement->StopMovementImmediately();
+	
+	ProjectileMovement->HomingTargetComponent =
+		ReturnTarget;
+
+	ProjectileMovement->bIsHomingProjectile = true;
+
+	const FVector ReturnDirection = LastHolder->GetActorLocation() - GetActorLocation().GetSafeNormal();
+	
+	ProjectileMovement->Velocity =
+		ReturnDirection * ThrowSpeed;
+
+	ProjectileMovement->Activate(true);
+	ProjectileMovement->UpdateComponentVelocity();
+
+	ForceNetUpdate();
+}
+
+void AP2CBomb::HandleFlightTimeout()
+{
+	if (!HasAuthority() || BombState != EP2CBombState::Flying)
+	{
+		return;
+	}
+	
+	BeginReturn();
 }

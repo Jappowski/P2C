@@ -8,6 +8,7 @@
 #include "GameFramework/PawnMovementComponent.h"
 #include "Gameplay/P2CGameRules.h"
 #include "Player/P2CPlayerState.h"
+#include "Player/Components/P2CPlayerStatsComponent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogP2CArena, Log, All);
 
@@ -175,7 +176,7 @@ void AP2CArenaGameMode::ActiveBombRound()
 		ArenaGameState->SetArenaPhase(EP2CArenaPhase::BombActive);
 	}
 	
-	UE_LOG(LogTemp, Log, TEXT("Round started"));
+	StartBombFuse();
 }
 
 void AP2CArenaGameMode::SetAllPlayerMovementEnabled(bool bEnabled)
@@ -311,4 +312,110 @@ void AP2CArenaGameMode::RefreshAlivePlayerCount()
 AP2CArenaGameState* AP2CArenaGameMode::GetP2CArenaGameState() const
 {
 	return GetGameState<AP2CArenaGameState>();
+}
+
+void AP2CArenaGameMode::StartBombFuse()
+{
+	if (!HasAuthority() || !IsValid(ActiveBomb))
+	{
+		return;
+	}
+	GetWorldTimerManager().ClearTimer(BombFuseTimerHandle);
+	
+	const float FuseDuration = FMath::FRandRange(
+		MinimumBombFuseDuration,
+		MaximumBombFuseDuration
+	);
+	
+	GetWorldTimerManager().SetTimer(
+		BombFuseTimerHandle,
+		this,
+		&ThisClass::HandleBombFuseExpired,
+		FuseDuration,
+		false
+	);
+	
+	UE_LOG(
+		LogP2CArena,
+		Log,
+		TEXT("Bomb fuse started. Duration: %.2f seconds."),
+		FuseDuration
+	);
+}
+
+void AP2CArenaGameMode::HandleBombFuseExpired()
+{
+	if (!HasAuthority() || !IsValid(ActiveBomb))
+	{
+		return;
+	}
+	
+	AP2CArenaGameState* ArenaGameState = GetP2CArenaGameState();
+	if (!IsValid(ArenaGameState) || ArenaGameState->GetArenaPhase() != EP2CArenaPhase::BombActive)
+	{
+		return;
+	}
+	
+	AP2CCharacter* ResponsibleCharacter = ActiveBomb->GetResponsibleCharacter();
+	
+	ArenaGameState->SetArenaPhase(EP2CArenaPhase::ResolvingExplosion);
+	ActiveBomb->Explode();
+	
+	if (!IsValid(ResponsibleCharacter))
+	{
+		UE_LOG(
+			LogP2CArena,
+			Error,
+			TEXT(
+				"Bomb exploded, but responsible "
+				"character is invalid."
+			)
+		);
+		return;
+	}
+
+	EliminateCharacter(ResponsibleCharacter);
+}
+
+void AP2CArenaGameMode::EliminateCharacter(AP2CCharacter* Character)
+{
+	if (!HasAuthority() || !IsValid(Character))
+	{
+		return;
+	}
+	
+	AP2CPlayerState* PlayerState = Character->GetPlayerState<AP2CPlayerState>();
+	UP2CPlayerStatsComponent* PlayerStatsComponent = Character->GetPlayerStatsComponent();
+	
+	if (!IsValid(PlayerState) || !IsValid(PlayerStatsComponent))
+	{
+		UE_LOG(
+			LogP2CArena,
+			Error,
+			TEXT(
+				"Cannot eliminate %s: missing "
+				"PlayerState or StatsComponent."
+			),
+			*GetNameSafe(Character)
+		);
+		return;
+	}
+	
+	if (!PlayerState->IsAlive())
+	{
+		return;
+	}
+	
+	// Bomb one shots player by design
+	PlayerStatsComponent->ApplyDamage(PlayerStatsComponent->GetMaxHealth());
+	
+	PlayerState->SetIsAlive(false);
+
+	SetCharacterMovementEnabled(Character, false);
+	UE_LOG(
+		LogP2CArena,
+		Log,
+		TEXT("Player %s was eliminated."),
+		*PlayerState->GetPlayerName()
+	);
 }

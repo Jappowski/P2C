@@ -27,6 +27,22 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "P2C|Arena", meta = (ClampMin = "0.0"))
 	float PreparationDuration = 3.0f;
 	
+	UPROPERTY(
+	EditDefaultsOnly,
+	BlueprintReadOnly,
+	Category = "P2C|Bomb",
+	meta = (ClampMin = "0.1")
+	)
+	float MinimumBombFuseDuration = 10.0f;
+	
+	UPROPERTY(
+	EditDefaultsOnly,
+	BlueprintReadOnly,
+	Category = "P2C|Bomb",
+	meta = (ClampMin = "0.1")
+	)
+	float MaximumBombFuseDuration = 30.0f;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "P2C|Bomb")
 	TSubclassOf<AP2CBomb> BombClass;
 
@@ -36,6 +52,8 @@ private:
 	
 	bool bPreparationStarted = false;
 	FTimerHandle PreparationTimerHandle;
+	FTimerHandle BombFuseTimerHandle;
+
 	
 	void TryStartPreparation();
 	void StartPreparation(AP2CCharacter* InitialHolder);
@@ -48,4 +66,8 @@ private:
 	void RefreshAlivePlayerCount();
 
 	AP2CArenaGameState* GetP2CArenaGameState() const;
+
+	void StartBombFuse();
+	void HandleBombFuseExpired();
+	void EliminateCharacter(AP2CCharacter* Character);
 };

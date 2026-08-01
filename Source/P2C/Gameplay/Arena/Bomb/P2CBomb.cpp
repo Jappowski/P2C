@@ -142,6 +142,65 @@ bool AP2CBomb::LaunchFromHolder(const FVector& Direction)
 	return true;
 }
 
+AP2CCharacter* AP2CBomb::GetResponsibleCharacter() const
+{
+	switch (BombState) {
+	case EP2CBombState::Attached:
+		return CurrentHolder;
+		break;
+	case EP2CBombState::Flying:
+		return LastHolder;
+		break;
+	case EP2CBombState::Returning:
+		return LastHolder;
+		break;
+	case EP2CBombState::Exploded:
+		default:
+		return nullptr;
+	}
+}
+
+void AP2CBomb::Explode()
+{
+	if (!HasAuthority())
+	{
+		ensureMsgf(false, TEXT("Explode may only be called by the server."));
+		return;
+	}
+	
+	if (BombState == EP2CBombState::Exploded)
+	{
+		return;
+	}
+	
+	GetWorldTimerManager().ClearTimer(FlightTimeoutHandle);
+	if (IsValid(LastHolder))
+	{
+		CollisionComponent->IgnoreActorWhenMoving(
+			LastHolder,
+			false
+		);
+	}
+	
+	ProjectileMovement->bIsHomingProjectile = false;
+	ProjectileMovement->HomingTargetComponent.Reset();
+	ProjectileMovement->StopMovementImmediately();
+	ProjectileMovement->Deactivate();
+	
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	
+	CurrentHolder = nullptr;
+	LastHolder = nullptr;
+	BombState = EP2CBombState::Exploded;
+	
+	SetOwner(nullptr);
+
+	ApplyStatePresentation();
+
+	OnBombHolderChanged.Broadcast(nullptr);
+	ForceNetUpdate();
+}
+
 void AP2CBomb::BeginPlay()
 {
 	Super::BeginPlay();

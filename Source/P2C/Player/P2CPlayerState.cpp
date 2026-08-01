@@ -86,6 +86,8 @@ void AP2CPlayerState::SetIsAlive(bool bNewIsAlive)
 			false,
 			TEXT("SetIsAlive may only be called by the server.")
 		);
+		
+		return;
 	}
 	
 	if (bIsAlive == bNewIsAlive)
@@ -106,6 +108,8 @@ void AP2CPlayerState::ResetArenaState()
 			false,
 			TEXT("ResetArenaState may only be called by the server.")
 		);
+		
+		return;
 	}
 	
 	const bool bPointsChanged = MatchPoints != 0;

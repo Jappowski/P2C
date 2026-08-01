@@ -53,6 +53,20 @@ public:
 	* Returns true, when bomb is thrown correctly
 	*/
 	bool LaunchFromHolder(const FVector& Direction);
+		
+	/**
+	 * Server-only gameplay information.
+	 *
+	 * Attached  -> CurrentHolder
+	 * Flying    -> LastHolder
+	 * Returning -> LastHolder
+	*/
+	AP2CCharacter* GetResponsibleCharacter() const;
+
+	/**
+	 * Server-only
+	*/
+	void Explode();
 
 	UPROPERTY(BlueprintAssignable, Category = "P2C|Bomb")
 	FP2CBombHolderChangedSignature OnBombHolderChanged;

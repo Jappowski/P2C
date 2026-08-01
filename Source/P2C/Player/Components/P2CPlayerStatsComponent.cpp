@@ -70,9 +70,15 @@ bool UP2CPlayerStatsComponent::ApplyDamage(float DamageAmount)
 		return false;
 	}
 	const float PreviousHealth = CurrentHealth;
-	CurrentHealth -= DamageAmount;
-	BroadcastHealthChanged();
+	CurrentHealth = FMath::Clamp(
+		CurrentHealth - DamageAmount,
+		0.0f,
+		MaxHealth
+	);
 	
+	BroadcastHealthChanged();
+	ForceOwnerNetUpdate();
+
 	return PreviousHealth > 0.0f && CurrentHealth <= 0.0f;
 }
 

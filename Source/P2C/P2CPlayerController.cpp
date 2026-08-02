@@ -152,12 +152,17 @@ void AP2CPlayerController::TryCreateArenaHUDWidget()
 	
 	if (!IsValid(ArenaGameState))
 	{
+		return;
+	}
+	
+	if (!ArenaHUDWidgetClass)
+	{
 		UE_LOG(
 			LogTemp,
 			Error,
 			TEXT("ArenaHUDWidgetClass is not configured.")
 		);
-		
+
 		return;
 	}
 	

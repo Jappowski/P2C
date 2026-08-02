@@ -39,7 +39,7 @@ void UP2CArenaHUDWidget::BindToGameplaySources()
 
 		if (IsValid(BoundStatsComponent))
 		{
-			BoundStatsComponent->OnStaminaChanged.AddDynamic(
+			BoundStatsComponent->OnStaminaChanged.AddUniqueDynamic(
 				this,
 				&ThisClass::HandleStaminaChanged
 			);
@@ -50,9 +50,14 @@ void UP2CArenaHUDWidget::BindToGameplaySources()
 	
 	if (IsValid(BoundPlayerState))
 	{
-		BoundPlayerState->OnMatchPointsChanged.AddDynamic(
+		BoundPlayerState->OnMatchPointsChanged.AddUniqueDynamic(
 			this,
 			&ThisClass::HandleMatchPointsChanged
+		);
+		
+		BoundPlayerState->OnAliveStateChanged.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleAliveStateChanged
 		);
 	}
 
@@ -63,7 +68,7 @@ void UP2CArenaHUDWidget::BindToGameplaySources()
 
 	if (IsValid(BoundArenaGameState))
 	{
-		BoundArenaGameState->OnAlivePlayerCountChanged.AddDynamic(
+		BoundArenaGameState->OnAlivePlayerCountChanged.AddUniqueDynamic(
 			this,
 			&ThisClass::HandleAlivePlayerCountChanged
 		);
@@ -82,6 +87,7 @@ void UP2CArenaHUDWidget::BindToGameplaySources()
 	RefreshStamina();
 	RefreshMatchPoints();
 	RefreshAlivePlayerCount();
+	RefreshStaminaVisibility();
 }
 
 void UP2CArenaHUDWidget::UnbindFromGameplaySources()
@@ -99,6 +105,11 @@ void UP2CArenaHUDWidget::UnbindFromGameplaySources()
 		BoundPlayerState->OnMatchPointsChanged.RemoveDynamic(
 			this,
 			&ThisClass::HandleMatchPointsChanged
+		);
+		
+		BoundPlayerState->OnAliveStateChanged.RemoveDynamic(
+			this,
+			&ThisClass::HandleAliveStateChanged
 		);
 	}
 	
@@ -193,6 +204,22 @@ void UP2CArenaHUDWidget::RefreshRoundSummary()
 					: WinnerName
 			)
 		)
+	);
+}
+
+void UP2CArenaHUDWidget::RefreshStaminaVisibility()
+{
+	if (!IsValid(StaminaPanel))
+	{
+		return;
+	}
+
+	const bool bShouldShowStamina = IsValid(BoundPlayerState) && BoundPlayerState->IsAlive();
+
+	StaminaPanel->SetVisibility(
+		bShouldShowStamina
+			? ESlateVisibility::Visible
+			: ESlateVisibility::Collapsed
 	);
 }
 
@@ -300,4 +327,9 @@ void UP2CArenaHUDWidget::HandleRoundWinnerChanged(const FString& WinnerName)
 			)
 		)
 	);
+}
+
+void UP2CArenaHUDWidget::HandleAliveStateChanged(bool bNewIsAlive)
+{
+	RefreshStaminaVisibility();
 }

@@ -196,7 +196,7 @@ void AP2CBomb::Explode()
 	SetOwner(nullptr);
 
 	ApplyStatePresentation();
-
+	MulticastPlayExplosionEffect();
 	OnBombHolderChanged.Broadcast(nullptr);
 	ForceNetUpdate();
 }
@@ -308,6 +308,11 @@ void AP2CBomb::HandleBombOverlap(UPrimitiveComponent* OverlappedComponent, AActo
 		this,
 		HitCharacter
 	);
+}
+
+void AP2CBomb::MulticastPlayExplosionEffect_Implementation()
+{
+	BP_PlayExplosionEffect();
 }
 
 void AP2CBomb::AttachToCurrentHolder()

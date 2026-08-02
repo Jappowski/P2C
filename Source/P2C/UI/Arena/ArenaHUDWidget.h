@@ -32,6 +32,7 @@ private:
 	void RefreshMatchPoints();
 	void RefreshAlivePlayerCount();
 	void RefreshRoundSummary();
+	void RefreshStaminaVisibility();
 	
 	UFUNCTION()
 	void HandleStaminaChanged(float CurrentStamina, float MaxStamina);
@@ -47,6 +48,10 @@ private:
 
 	UFUNCTION()
 	void HandleRoundWinnerChanged(const FString& WinnerName);
+	
+	UFUNCTION()
+	void HandleAliveStateChanged(bool bNewIsAlive);
+
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> StaminaBar;
@@ -74,4 +79,7 @@ private:
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> WinnerText;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UWidget> StaminaPanel;
 };

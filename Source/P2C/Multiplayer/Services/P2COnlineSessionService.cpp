@@ -4,6 +4,7 @@
 #include "Engine/World.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
+#include "GameFramework/PlayerState.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogP2COnlineSessions, Log, All);
 
@@ -11,6 +12,7 @@ namespace
 {
 	const FName MatchTypeKey(TEXT("MatchType"));
 	const FString MatchTypeValue(TEXT("Arena"));
+    const FName HostDisplayNameKey(TEXT("HostDisplayName"));
 }
 
 UP2COnlineSessionService::UP2COnlineSessionService()
@@ -195,8 +197,31 @@ void UP2COnlineSessionService::CreateSession(const int32 NumPublicConnections)
         FMath::Max(1, NumPublicConnections);
 
     LastSessionSettings->Set(
-        MatchTypeKey,
-        MatchTypeValue,
+    MatchTypeKey,
+    MatchTypeValue,
+    EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+    
+    FString HostDisplayName;
+
+    if (UWorld* World = GetOwningWorld())
+    {
+        if (APlayerController* PlayerController = World->GetFirstPlayerController())
+        {
+            if (APlayerState* PlayerState = PlayerController->GetPlayerState<APlayerState>())
+            {
+                HostDisplayName = PlayerState->GetPlayerName();
+            }
+        }
+    }
+
+    if (HostDisplayName.IsEmpty())
+    {
+        HostDisplayName = FPlatformProcess::ComputerName();
+    }
+
+    LastSessionSettings->Set(
+        HostDisplayNameKey,
+        HostDisplayName,
         EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 
     CreateSessionCompleteDelegateHandle =
@@ -403,10 +428,16 @@ void UP2COnlineSessionService::HandleFindSessionsComplete(const bool bWasSuccess
         }
 
         FP2CSessionSearchResult ResultInfo;
-
         ResultInfo.ResultIndex = Index;
-        ResultInfo.HostName =
-            SearchResult.Session.OwningUserName;
+
+        const bool bHasHostDisplayName = SearchResult.Session.SessionSettings.Get(
+            HostDisplayNameKey, 
+            ResultInfo.HostName);
+
+        if (!bHasHostDisplayName ||ResultInfo.HostName.IsEmpty())
+        {
+            ResultInfo.HostName = SearchResult.Session.OwningUserName;
+        }
 
         if (ResultInfo.HostName.IsEmpty())
         {

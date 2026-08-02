@@ -60,13 +60,23 @@ void UP2CArenaHUDWidget::BindToGameplaySources()
 	{
 		BoundArenaGameState = World->GetGameState<AP2CArenaGameState>();
 	}
-	
+
 	if (IsValid(BoundArenaGameState))
 	{
 		BoundArenaGameState->OnAlivePlayerCountChanged.AddDynamic(
-				this,
-				&ThisClass::HandleAlivePlayerCountChanged
-			);
+			this,
+			&ThisClass::HandleAlivePlayerCountChanged
+		);
+
+		BoundArenaGameState->OnArenaPhaseChanged.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleArenaPhaseChanged
+		);
+
+		BoundArenaGameState->OnRoundWinnerChanged.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleRoundWinnerChanged
+		);
 	}
 	
 	RefreshStamina();
@@ -138,6 +148,54 @@ void UP2CArenaHUDWidget::RefreshAlivePlayerCount()
 	HandleAlivePlayerCountChanged(AlivePlayerCount);
 }
 
+void UP2CArenaHUDWidget::RefreshRoundSummary()
+{
+	const UWorld* World = GetWorld();
+	if (!IsValid(World) || !IsValid(RoundSummaryPanel) ||!IsValid(WinnerText))
+	{
+		return;
+	}
+
+	 AP2CArenaGameState* ArenaGameState = World->GetGameState<AP2CArenaGameState>();
+
+	if (!IsValid(ArenaGameState))
+	{
+		RoundSummaryPanel->SetVisibility(ESlateVisibility::Collapsed);
+
+		return;
+	}
+
+	const bool bRoundEnded = ArenaGameState->GetArenaPhase() ==EP2CArenaPhase::RoundEnded;
+
+	RoundSummaryPanel->SetVisibility(
+		bRoundEnded
+			? ESlateVisibility::Visible
+			: ESlateVisibility::Collapsed
+	);
+
+	if (!bRoundEnded)
+	{
+		return;
+	}
+
+	const FString WinnerName = ArenaGameState->GetRoundWinnerName();
+
+	WinnerText->SetText(
+		FText::Format(
+			NSLOCTEXT(
+				"P2C",
+				"RoundWinnerFormat",
+				"Winner: {0}"
+			),
+			FText::FromString(
+				WinnerName.IsEmpty()
+					? TEXT("Unknown")
+					: WinnerName
+			)
+		)
+	);
+}
+
 void UP2CArenaHUDWidget::HandleStaminaChanged(float CurrentStamina, float MaxStamina)
 {
 	const float StaminaPercent = MaxStamina > 0.0f
@@ -190,6 +248,55 @@ void UP2CArenaHUDWidget::HandleAlivePlayerCountChanged(int32 NewAlivePlayerCount
 			FString::Printf(
 				TEXT("Players alive: %d"),
 				NewAlivePlayerCount
+			)
+		)
+	);
+}
+
+void UP2CArenaHUDWidget::HandleArenaPhaseChanged(EP2CArenaPhase NewPhase)
+{
+	RefreshRoundSummary();
+}
+
+void UP2CArenaHUDWidget::HandleRoundWinnerChanged(const FString& WinnerName)
+{
+	const UWorld* World = GetWorld();
+	if (!IsValid(World) || !IsValid(RoundSummaryPanel) || !IsValid(WinnerText))
+	{
+		return;
+	}
+	
+	AP2CArenaGameState* ArenaGameState = World->GetGameState<AP2CArenaGameState>();
+	if (!IsValid(ArenaGameState))
+	{
+		RoundSummaryPanel->SetVisibility(ESlateVisibility::Collapsed);
+
+		return;
+	}
+
+	const bool bRoundEnded = ArenaGameState->GetArenaPhase() ==EP2CArenaPhase::RoundEnded;
+
+	RoundSummaryPanel->SetVisibility(bRoundEnded
+			? ESlateVisibility::Visible
+			: ESlateVisibility::Collapsed
+	);
+	
+	if (!bRoundEnded)
+	{
+		return;
+	}
+
+	WinnerText->SetText(
+		FText::Format(
+			NSLOCTEXT(
+				"P2C",
+				"RoundWinnerFormat",
+				"Winner: {0}"
+			),
+			FText::FromString(
+				WinnerName.IsEmpty()
+					? TEXT("Unknown")
+					: WinnerName
 			)
 		)
 	);

@@ -16,6 +16,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	NewAlivePlayerCount
 );
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FP2CRoundWinnerChangedSignature,
+	const FString&,
+	NewWinnerName
+);
+
 UCLASS()
 class P2C_API AP2CArenaGameState : public AGameStateBase
 {
@@ -32,11 +38,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "P2C|Arena")
 	int32 GetAlivePlayerCount();
 	
+	UFUNCTION(BlueprintPure, Category = "P2C|Arena")
+	FString GetRoundWinnerName() const;
+	
 	UPROPERTY(BlueprintAssignable, Category = "P2C|Arena")
 	FP2CArenaPhaseChangedSignature OnArenaPhaseChanged;
 
 	UPROPERTY(BlueprintAssignable, Category = "P2C|Arena")
 	FP2CAlivePlayerCountChangedSignature OnAlivePlayerCountChanged;
+	
+	UPROPERTY(BlueprintAssignable, Category = "P2C|Arena")
+	FP2CRoundWinnerChangedSignature OnRoundWinnerChanged;
 	
 	/**
 	 * Server-only.
@@ -49,12 +61,20 @@ public:
 	 */
 	void SetAlivePlayerCount(int32 NewAlivePlayerCount);
 	
+	/**
+	 * Server-only.
+	*/
+	void SetRoundWinnerName(const FString& NewWinnerName);
+	
 private:
 	UFUNCTION()
 	void OnRep_ArenaPhase();
 	
 	UFUNCTION()
 	void OnRep_AlivePlayerCount();
+	
+	UFUNCTION()
+	void OnRep_RoundWinnerName();
 	
 	UPROPERTY(
 	   ReplicatedUsing = OnRep_ArenaPhase,
@@ -69,5 +89,12 @@ private:
 		Category = "P2C|Arena"
 	)
 	int32 AlivePlayerCount = 0;
+	
+	UPROPERTY(
+	ReplicatedUsing = OnRep_RoundWinnerName,
+	VisibleInstanceOnly,
+	Category = "P2C|Arena"
+	)
+	FString RoundWinnerName;
 };
 

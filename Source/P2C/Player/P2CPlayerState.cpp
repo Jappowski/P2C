@@ -112,7 +112,6 @@ void AP2CPlayerState::ResetArenaState()
 		return;
 	}
 	
-	const bool bPointsChanged = MatchPoints != 0;
 	const bool bAliveChanged = !bIsAlive;
 	
 	bIsAlive = true;
@@ -120,10 +119,6 @@ void AP2CPlayerState::ResetArenaState()
 	if (bAliveChanged)
 	{
 		OnAliveStateChanged.Broadcast(bIsAlive);
-	}
-
-	if (bPointsChanged || bAliveChanged)
-	{
 		ForceNetUpdate();
 	}
 }

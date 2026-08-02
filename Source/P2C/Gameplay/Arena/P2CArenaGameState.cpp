@@ -14,6 +14,7 @@ void AP2CArenaGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	
 	DOREPLIFETIME(AP2CArenaGameState, ArenaPhase);
 	DOREPLIFETIME(AP2CArenaGameState, AlivePlayerCount);
+	DOREPLIFETIME(AP2CArenaGameState, RoundWinnerName);
 }
 
 EP2CArenaPhase AP2CArenaGameState::GetArenaPhase()
@@ -24,6 +25,11 @@ EP2CArenaPhase AP2CArenaGameState::GetArenaPhase()
 int32 AP2CArenaGameState::GetAlivePlayerCount()
 {
 	return AlivePlayerCount;
+}
+
+FString AP2CArenaGameState::GetRoundWinnerName() const
+{
+	return RoundWinnerName;
 }
 
 void AP2CArenaGameState::SetArenaPhase(EP2CArenaPhase NewPhase)
@@ -64,6 +70,25 @@ void AP2CArenaGameState::SetAlivePlayerCount(int32 NewAlivePlayerCount)
 	ForceNetUpdate();
 }
 
+void AP2CArenaGameState::SetRoundWinnerName(const FString& NewWinnerName)
+{
+	if (!HasAuthority())
+	{
+		ensureMsgf(false, TEXT("Only the server can set the round winner."));
+
+		return;
+	}
+	
+	if (RoundWinnerName == NewWinnerName)
+	{
+		return;
+	}
+	
+	RoundWinnerName = NewWinnerName;
+	OnRoundWinnerChanged.Broadcast(RoundWinnerName);
+	ForceNetUpdate();
+}
+
 void AP2CArenaGameState::OnRep_ArenaPhase()
 {
 	OnArenaPhaseChanged.Broadcast(ArenaPhase);
@@ -72,5 +97,10 @@ void AP2CArenaGameState::OnRep_ArenaPhase()
 void AP2CArenaGameState::OnRep_AlivePlayerCount()
 {
 	OnAlivePlayerCountChanged.Broadcast(AlivePlayerCount);
+}
+
+void AP2CArenaGameState::OnRep_RoundWinnerName()
+{
+	OnRoundWinnerChanged.Broadcast(RoundWinnerName);
 }
 

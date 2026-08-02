@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Gameplay/Arena/P2CArenaTypes.h"
+
 #include "ArenaHUDWidget.generated.h"
 
 class AP2CArenaGameState;
@@ -29,6 +31,7 @@ private:
 	void RefreshStamina();
 	void RefreshMatchPoints();
 	void RefreshAlivePlayerCount();
+	void RefreshRoundSummary();
 	
 	UFUNCTION()
 	void HandleStaminaChanged(float CurrentStamina, float MaxStamina);
@@ -38,6 +41,12 @@ private:
 	
 	UFUNCTION()
 	void HandleAlivePlayerCountChanged(int32 NewAlivePlayerCount);
+	
+	UFUNCTION()
+	void HandleArenaPhaseChanged(EP2CArenaPhase NewPhase);
+
+	UFUNCTION()
+	void HandleRoundWinnerChanged(const FString& WinnerName);
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> StaminaBar;
@@ -59,4 +68,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AP2CArenaGameState> BoundArenaGameState;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UWidget> RoundSummaryPanel;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UTextBlock> WinnerText;
 };

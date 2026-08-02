@@ -1,5 +1,4 @@
-﻿#include "E:\P2C\Intermediate\Build\Win64\x64\P2CEditor\Development\UnrealEd\SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.h"
-#include "P2CStaminaPickup.h"
+﻿#include "P2CStaminaPickup.h"
 
 #include "Player/P2CPlayerState.h"
 #include "Player/Components/P2CPlayerStatsComponent.h"

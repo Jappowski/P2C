@@ -22,6 +22,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogP2CArena, Log, All);
 AP2CArenaGameMode::AP2CArenaGameMode()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	bUseSeamlessTravel = true;
 	
 	GameStateClass = AP2CArenaGameState::StaticClass();
 	PlayerStateClass = AP2CPlayerState::StaticClass();
@@ -628,6 +629,11 @@ void AP2CArenaGameMode::EndArenaRound()
 	if (IsValid(WinnerPlayerState))
 	{
 		WinnerPlayerState->AddMatchPoints(1);
+		ArenaGameState->SetRoundWinnerName(WinnerPlayerState->GetPlayerName());
+	}
+	else
+	{
+		ArenaGameState->SetRoundWinnerName(TEXT(""));
 	}
 	
 	ResetStaminaPickupCycle();

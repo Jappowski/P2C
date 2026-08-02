@@ -11,6 +11,7 @@ class AP2CCharacter;
 class AP2CBomb;
 class AP2CArenaGameState;
 class APlayerController;
+class APlayerStart;
 
 UCLASS()
 class P2C_API AP2CArenaGameMode : public AP2CGameMode

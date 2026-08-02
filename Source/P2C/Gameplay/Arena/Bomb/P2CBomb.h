@@ -93,6 +93,12 @@ protected:
 		const FHitResult& SweepResult
 	);
 	
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPlayExplosionEffect();
+	
+	UFUNCTION(BlueprintImplementableEvent, Category = "P2C|Bomb|Presentation")
+	void BP_PlayExplosionEffect();
+	
 	void AttachToCurrentHolder();
 	void ApplyStatePresentation();
 	

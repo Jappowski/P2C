@@ -77,11 +77,17 @@ void UP2CArenaHUDWidget::BindToGameplaySources()
 			this,
 			&ThisClass::HandleRoundWinnerChanged
 		);
+		
+		BoundPlayerState->OnAliveStateChanged.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleAliveStateChanged
+		);
 	}
 	
 	RefreshStamina();
 	RefreshMatchPoints();
 	RefreshAlivePlayerCount();
+	RefreshStaminaVisibility();
 }
 
 void UP2CArenaHUDWidget::UnbindFromGameplaySources()
@@ -99,6 +105,11 @@ void UP2CArenaHUDWidget::UnbindFromGameplaySources()
 		BoundPlayerState->OnMatchPointsChanged.RemoveDynamic(
 			this,
 			&ThisClass::HandleMatchPointsChanged
+		);
+		
+		BoundPlayerState->OnAliveStateChanged.RemoveDynamic(
+			this,
+			&ThisClass::HandleAliveStateChanged
 		);
 	}
 	
@@ -193,6 +204,22 @@ void UP2CArenaHUDWidget::RefreshRoundSummary()
 					: WinnerName
 			)
 		)
+	);
+}
+
+void UP2CArenaHUDWidget::RefreshStaminaVisibility()
+{
+	if (!IsValid(StaminaPanel))
+	{
+		return;
+	}
+
+	const bool bShouldShowStamina = IsValid(BoundPlayerState) && BoundPlayerState->IsAlive();
+
+	StaminaPanel->SetVisibility(
+		bShouldShowStamina
+			? ESlateVisibility::Visible
+			: ESlateVisibility::Collapsed
 	);
 }
 
@@ -300,4 +327,9 @@ void UP2CArenaHUDWidget::HandleRoundWinnerChanged(const FString& WinnerName)
 			)
 		)
 	);
+}
+
+void UP2CArenaHUDWidget::HandleAliveStateChanged(bool bNewIsAlive)
+{
+	RefreshStaminaVisibility();
 }

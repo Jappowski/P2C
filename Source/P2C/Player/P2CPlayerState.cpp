@@ -115,13 +115,7 @@ void AP2CPlayerState::ResetArenaState()
 	const bool bPointsChanged = MatchPoints != 0;
 	const bool bAliveChanged = !bIsAlive;
 	
-	MatchPoints = 0;
 	bIsAlive = true;
-	
-	if (bPointsChanged)
-	{
-		OnMatchPointsChanged.Broadcast(MatchPoints);
-	}
 
 	if (bAliveChanged)
 	{
@@ -190,14 +184,17 @@ void AP2CPlayerState::CopyProperties(APlayerState* PlayerState)
 	}
 
 	NewPlayerState->bIsReady = bIsReady;
-
+	NewPlayerState->MatchPoints = MatchPoints;
+	
 	UE_LOG(
 		LogTemp,
 		Log,
 		TEXT(
-			"Copied PlayerState properties for %s. Ready: %s"
+			"Copied PlayerState properties for %s. "
+			"Ready: %s, MatchPoints: %d"
 		),
 		*GetPlayerName(),
-		bIsReady ? TEXT("true") : TEXT("false")
+		bIsReady ? TEXT("true") : TEXT("false"),
+		MatchPoints
 	);
 }

@@ -9,6 +9,7 @@
 #include "InputMappingContext.h"
 #include "Blueprint/UserWidget.h"
 #include "P2C.h"
+#include "Camera/CameraActor.h"
 #include "Gameplay/Arena/P2CArenaGameMode.h"
 #include "Lobby/P2CLobbyGameMode.h"
 #include "Player/P2CPlayerState.h"
@@ -16,6 +17,7 @@
 #include "Lobby/P2CLobbyGameState.h"
 #include "UI/Lobby/P2CLobbyWidget.h"
 #include "Gameplay/Arena/P2CArenaGameState.h"
+#include "Kismet/GameplayStatics.h"
 #include "UI/Arena/ArenaHUDWidget.h"
 
 
@@ -274,6 +276,59 @@ void AP2CPlayerController::SetupInputComponent()
 bool AP2CPlayerController::ShouldUseTouchControls() const
 {
 	return SVirtualJoystick::ShouldDisplayTouchInterface() || bForceTouchControls;
+}
+
+void AP2CPlayerController::ClientHandleArenaTeleport_Implementation(FRotator NewControlRotation)
+{
+	NewControlRotation.Pitch = 0.0f;
+	NewControlRotation.Roll = 0.0f;
+	
+	SetControlRotation(NewControlRotation);
+	APawn* ControlledPawn = GetPawn();
+
+	if (IsValid(ControlledPawn))
+	{
+		SetViewTarget(ControlledPawn);
+	}
+	
+	if (IsValid(PlayerCameraManager))
+	{
+		PlayerCameraManager->SetGameCameraCutThisFrame();
+	}
+}
+
+void AP2CPlayerController::ClientEnterArenaOverview_Implementation()
+{
+	static const FName SpectatorCameraTag(TEXT("ArenaSpectatorCamera"));
+	TArray<AActor*> SpectatorCameras;
+	
+	UGameplayStatics::GetAllActorsOfClassWithTag(
+		this,
+		ACameraActor::StaticClass(),
+		SpectatorCameraTag,
+		SpectatorCameras
+		);
+	
+	if (SpectatorCameras.IsEmpty())
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT(
+				"Cannot enter arena overview: "
+				"camera with tag %s was not found"
+			),
+			*SpectatorCameraTag.ToString()
+		);
+
+		return;
+	}
+
+	AActor* SpectatorCamera = SpectatorCameras[0];
+	SetViewTargetWithBlend(
+		SpectatorCamera,
+		0.35f
+	);
 }
 
 // for the server and local host

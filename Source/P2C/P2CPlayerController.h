@@ -27,6 +27,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Lobby")
 	void RequestStartMatch();
+	
+	UFUNCTION(Client, Reliable)
+	void ClientHandleArenaTeleport(FRotator NewControlRotation);
+	
+	UFUNCTION(Client, Reliable)
+	void ClientEnterArenaOverview();
 
 protected:
 	/** Gameplay initialization */
@@ -61,8 +67,7 @@ protected:
 	UPROPERTY(EditAnywhere, Config, Category = "Input|Touch Controls")
 	bool bForceTouchControls = false;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI"
-	)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
 	TSubclassOf<UP2CLobbyWidget> LobbyWidgetClass;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")

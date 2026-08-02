@@ -39,7 +39,7 @@ void UP2CArenaHUDWidget::BindToGameplaySources()
 
 		if (IsValid(BoundStatsComponent))
 		{
-			BoundStatsComponent->OnStaminaChanged.AddDynamic(
+			BoundStatsComponent->OnStaminaChanged.AddUniqueDynamic(
 				this,
 				&ThisClass::HandleStaminaChanged
 			);
@@ -50,9 +50,14 @@ void UP2CArenaHUDWidget::BindToGameplaySources()
 	
 	if (IsValid(BoundPlayerState))
 	{
-		BoundPlayerState->OnMatchPointsChanged.AddDynamic(
+		BoundPlayerState->OnMatchPointsChanged.AddUniqueDynamic(
 			this,
 			&ThisClass::HandleMatchPointsChanged
+		);
+		
+		BoundPlayerState->OnAliveStateChanged.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleAliveStateChanged
 		);
 	}
 
@@ -63,7 +68,7 @@ void UP2CArenaHUDWidget::BindToGameplaySources()
 
 	if (IsValid(BoundArenaGameState))
 	{
-		BoundArenaGameState->OnAlivePlayerCountChanged.AddDynamic(
+		BoundArenaGameState->OnAlivePlayerCountChanged.AddUniqueDynamic(
 			this,
 			&ThisClass::HandleAlivePlayerCountChanged
 		);
@@ -76,11 +81,6 @@ void UP2CArenaHUDWidget::BindToGameplaySources()
 		BoundArenaGameState->OnRoundWinnerChanged.AddUniqueDynamic(
 			this,
 			&ThisClass::HandleRoundWinnerChanged
-		);
-		
-		BoundPlayerState->OnAliveStateChanged.AddUniqueDynamic(
-			this,
-			&ThisClass::HandleAliveStateChanged
 		);
 	}
 	

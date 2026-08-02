@@ -21,16 +21,6 @@ void UP2CLobbyPlayerEntryWidget::InitializeFromPlayerState(AP2CPlayerState* InPl
 			this,
 			&ThisClass::HandlePlayerDataChanged
 		);
-
-		CachedPlayerState->OnPlayerDataChanged.AddDynamic(
-			this,
-			&ThisClass::HandlePlayerDataChanged
-		);
-		
-		CachedPlayerState->OnPlayerDataChanged.AddDynamic(
-			this,
-			&ThisClass::HandlePlayerDataChanged
-		);
 		
 		CachedPlayerState->OnPlayerDataChanged.AddUniqueDynamic(
 			this,

@@ -4,7 +4,6 @@
 #include "P2CArenaGameState.h"
 #include "P2CCharacter.h"
 #include "P2CPlayerController.h"
-#include "VisualizeTexture.h"
 #include "Bomb/P2CBomb.h"
 #include "Engine/TargetPoint.h"
 #include "GameFramework/CharacterMovementComponent.h"

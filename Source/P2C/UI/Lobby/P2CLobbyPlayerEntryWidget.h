@@ -25,6 +25,9 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> ReadyStateText;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UTextBlock> MatchPointsText;
 
 private:
 	UPROPERTY()

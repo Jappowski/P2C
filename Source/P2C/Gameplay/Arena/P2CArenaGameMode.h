@@ -20,6 +20,7 @@ class P2C_API AP2CArenaGameMode : public AP2CGameMode
 public:
 	AP2CArenaGameMode();
 	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
+	virtual void Logout(AController* Exiting) override;
 	bool TryThrowBomb(AP2CPlayerController* RequestingController) const;
 	bool TryPassBombToCharacter(AP2CBomb* Bomb,AP2CCharacter* TargetCharacter) const;
 
@@ -150,4 +151,7 @@ private:
 	void StartStaminaPickupCycle();
 	void SpawnStaminaPickup();
 	void ResetStaminaPickupCycle();
+	
+	void ResolveArenaAfterDisconnect();
+	void CancelCurrentBombCycle();
 };

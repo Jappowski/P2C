@@ -47,6 +47,50 @@ void AP2CArenaGameMode::HandleStartingNewPlayer_Implementation(APlayerController
 	TryStartPreparation();
 }
 
+void AP2CArenaGameMode::Logout(AController* Exiting)
+{
+	Super::Logout(Exiting);
+	if (!HasAuthority())
+	{
+		Super::Logout(Exiting);
+		return;
+	}
+	
+	AP2CArenaGameState* ArenaGameState = GetP2CArenaGameState();
+	if (IsValid(ArenaGameState) && ArenaGameState->GetArenaPhase() == EP2CArenaPhase::RoundEnded)
+	{
+		Super::Logout(Exiting);
+		return;
+	}
+	
+	AP2CPlayerState* ExitingPlayerState = IsValid(Exiting)
+			? Exiting->GetPlayerState<AP2CPlayerState>()
+			: nullptr;
+	
+	const FString ExitingPlayerName = IsValid(ExitingPlayerState)
+			? ExitingPlayerState->GetPlayerName()
+			: TEXT("Unknown");
+	
+	if (IsValid(ExitingPlayerState) && ExitingPlayerState->IsAlive())
+	{
+		ExitingPlayerState->SetIsAlive(false);
+	}
+
+	UE_LOG(
+		LogP2CArena,
+		Log,
+		TEXT("Player disconnected from Arena: %s"),
+		*ExitingPlayerName
+	);
+	
+	CancelCurrentBombCycle();
+	Super::Logout(Exiting);
+	GetWorldTimerManager().SetTimerForNextTick(
+		this,
+		&ThisClass::ResolveArenaAfterDisconnect
+	);
+}
+
 bool AP2CArenaGameMode::TryThrowBomb(AP2CPlayerController* RequestingController) const
 {
 	if (!HasAuthority() || !IsValid(RequestingController) || !IsValid(ActiveBomb))
@@ -1011,4 +1055,53 @@ void AP2CArenaGameMode::ResetStaminaPickupCycle()
 	}
 
 	ActiveStaminaPickup.Reset();
+}
+
+void AP2CArenaGameMode::ResolveArenaAfterDisconnect()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	AP2CArenaGameState* ArenaGameState = GetP2CArenaGameState();
+
+	if (!IsValid(ArenaGameState))
+	{
+		return;
+	}
+	
+	RefreshAlivePlayerCount();
+	const int32 AlivePlayerCount = ArenaGameState->GetAlivePlayerCount();
+	if (AlivePlayerCount <= 1)
+	{
+		EndArenaRound();
+		return;
+	}
+
+	ArenaGameState->SetArenaPhase(
+			EP2CArenaPhase::Preparing
+		);
+
+	TryStartPreparation();
+}
+
+void AP2CArenaGameMode::CancelCurrentBombCycle()
+{
+	GetWorldTimerManager().ClearTimer(PreparationTimerHandle);
+	GetWorldTimerManager().ClearTimer(BombFuseTimerHandle);
+	GetWorldTimerManager().ClearTimer(NextBombCycleTimerHandle);
+	GetWorldTimerManager().ClearTimer(ReturnToLobbyTimerHandle);
+	GetWorldTimerManager().ClearTimer(PickupSpawnTimerHandle);
+
+	bPreparationStarted = false;
+	SetAllPlayerMovementEnabled(false);
+
+	if (IsValid(ActiveBomb))
+	{
+		ActiveBomb->Destroy();
+		ActiveBomb = nullptr;
+	}
+
+	ResetStaminaPickupCycle();
 }

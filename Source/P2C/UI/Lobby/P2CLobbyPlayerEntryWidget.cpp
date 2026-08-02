@@ -20,9 +20,19 @@ void UP2CLobbyPlayerEntryWidget::InitializeFromPlayerState(AP2CPlayerState* InPl
 		CachedPlayerState->OnPlayerDataChanged.RemoveDynamic(
 			this,
 			&ThisClass::HandlePlayerDataChanged
-);
+		);
 
 		CachedPlayerState->OnPlayerDataChanged.AddDynamic(
+			this,
+			&ThisClass::HandlePlayerDataChanged
+		);
+		
+		CachedPlayerState->OnPlayerDataChanged.AddDynamic(
+			this,
+			&ThisClass::HandlePlayerDataChanged
+		);
+		
+		CachedPlayerState->OnPlayerDataChanged.AddUniqueDynamic(
 			this,
 			&ThisClass::HandlePlayerDataChanged
 		);
@@ -52,8 +62,7 @@ void UP2CLobbyPlayerEntryWidget::RefreshView()
 
 	if (IsValid(PlayerNameText))
 	{
-		PlayerNameText->SetText(FText::FromString(CachedPlayerState->GetPlayerName())
-		);
+		PlayerNameText->SetText(FText::FromString(CachedPlayerState->GetPlayerName()));
 	}
 
 	if (IsValid(ReadyStateText))
@@ -62,6 +71,20 @@ void UP2CLobbyPlayerEntryWidget::RefreshView()
 			CachedPlayerState->IsReady()
 				? FText::FromString(TEXT("Ready"))
 				: FText::FromString(TEXT("Not Ready"))
+		);
+	}
+	
+	if (IsValid(MatchPointsText))
+	{
+		MatchPointsText->SetText(
+			FText::Format(
+				NSLOCTEXT(
+					"P2C",
+					"LobbyMatchPointsFormat",
+					"Points: {0}"
+				),
+				FText::AsNumber(CachedPlayerState->GetMatchPoints())
+			)
 		);
 	}
 }

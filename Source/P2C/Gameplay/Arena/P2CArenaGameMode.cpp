@@ -74,7 +74,34 @@ bool AP2CArenaGameMode::TryThrowBomb(AP2CPlayerController* RequestingController)
 		return false;
 	}
 	
-	return ActiveBomb->LaunchFromHolder(Thrower->GetActorForwardVector());
+	UP2CPlayerStatsComponent* StatsComponent = Thrower->GetPlayerStatsComponent();
+	if (!IsValid(StatsComponent))
+	{
+		UE_LOG(
+			LogP2CArena,
+			Error,
+			TEXT(
+				"Cannot throw bomb: %s has no StatsComponent."
+			),
+			*GetNameSafe(Thrower)
+		);
+
+		return false;
+	}
+	
+	if (!StatsComponent->CanConsumeStamina(BombThrowStaminaCost))
+	{
+		return false;
+	}
+	
+	const bool bBombLaunched = ActiveBomb->LaunchFromHolder(Thrower->GetActorForwardVector());
+
+	if (!bBombLaunched)
+	{
+		return false;
+	}
+	
+	return StatsComponent->ConsumeStamina(BombThrowStaminaCost);
 }
 
 bool AP2CArenaGameMode::TryPassBombToCharacter(AP2CBomb* Bomb, AP2CCharacter* TargetCharacter) const

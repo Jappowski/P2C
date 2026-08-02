@@ -59,6 +59,14 @@ protected:
 	)
 	float RoundEndDuration = 3.0f;
 	
+	UPROPERTY(
+	EditDefaultsOnly,
+	BlueprintReadOnly,
+	Category = "P2C|Arena|Stamina",
+	meta = (ClampMin = "1.0")
+	)
+	float BombThrowStaminaCost = 20.0f;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "P2C|Bomb")
 	TSubclassOf<AP2CBomb> BombClass;
 

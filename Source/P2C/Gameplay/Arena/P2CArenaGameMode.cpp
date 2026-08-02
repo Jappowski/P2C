@@ -295,13 +295,27 @@ void AP2CArenaGameMode::InitializeArena()
 	
 	for (APlayerState* BasePlayerState : ArenaGameState->PlayerArray)
 	{
-		AP2CPlayerState* P2CPlayerState =
-			Cast<AP2CPlayerState>(BasePlayerState);
+		AP2CPlayerState* P2CPlayerState = Cast<AP2CPlayerState>(BasePlayerState);
 
-		if (IsValid(P2CPlayerState))
+		if (!IsValid(P2CPlayerState))
 		{
-			P2CPlayerState->ResetArenaState();
+			return;
 		}
+		
+		P2CPlayerState->ResetArenaState();
+		
+		APawn* Pawn = P2CPlayerState->GetPawn();
+		AP2CCharacter* Character = Cast<AP2CCharacter>(Pawn);
+
+		if (!IsValid(Character))
+		{
+			continue;
+		}
+
+		Character->SetActorHiddenInGame(false);
+		Character->SetActorEnableCollision(true);
+
+		SetCharacterMovementEnabled(Character, false);
 	}
 	
 	ArenaGameState->SetArenaPhase(EP2CArenaPhase::Preparing);
@@ -439,9 +453,10 @@ void AP2CArenaGameMode::EliminateCharacter(AP2CCharacter* Character)
 	PlayerStatsComponent->ApplyDamage(PlayerStatsComponent->GetMaxHealth());
 	
 	PlayerState->SetIsAlive(false);
-
-	SetCharacterMovementEnabled(Character, false);
+	Character->SetActorHiddenInGame(true);
 	Character->SetActorEnableCollision(false);
+	SetCharacterMovementEnabled(Character, false);
+	PendingOverviewPlayerController = Cast<AP2CPlayerController>(Character->GetController());
 	
 	UE_LOG(
 		LogP2CArena,
@@ -473,7 +488,7 @@ void AP2CArenaGameMode::ResolveExplosion()
 	GetWorldTimerManager().SetTimer(
 		NextBombCycleTimerHandle,
 		this,
-		&ThisClass::StartNextBombCycle,
+		&ThisClass::CompletedExplosionResolution,
 		ExplosionResolutionDuration,
 		false
 		);
@@ -515,69 +530,36 @@ void AP2CArenaGameMode::StartNextBombCycle()
 
 void AP2CArenaGameMode::ResetAlivePlayersForNextCycle()
 {
-	UWorld* World = GetWorld();
-	if (!IsValid(World))
+	TArray<AP2CCharacter*> AliveCharacters;
+	GatherAliveCharacters(AliveCharacters);
+
+	TArray<APlayerStart*> AvailablePlayerStarts;
+	GatherPlayerStarts(AvailablePlayerStarts);
+
+	if (AvailablePlayerStarts.Num() < AliveCharacters.Num())
 	{
+		UE_LOG(
+			LogP2CArena,
+			Error,
+			TEXT(
+				"Not enough PlayerStarts. "
+				"Alive players: %d, PlayerStarts: %d"
+			),
+			AliveCharacters.Num(),
+			AvailablePlayerStarts.Num()
+		);
+
 		return;
 	}
-	
-	TArray<APlayerStart*> PlayerStarts;
 
-	for (TActorIterator<APlayerStart> Iterator(World); Iterator; ++Iterator)
+	ShufflePlayerStarts(AvailablePlayerStarts);
+
+	for (int32 Index = 0; Index < AliveCharacters.Num(); ++Index)
 	{
-		if (IsValid(*Iterator))
-		{
-			PlayerStarts.Add(*Iterator);
-		}
-	}
-	
-	for (int32 Index = PlayerStarts.Num() - 1; Index >= 0; --Index)
-	{
-		const int32 RandomIndex = FMath::RandHelper(PlayerStarts.Num());
-		PlayerStarts.Swap(Index, RandomIndex);
-	}
-	
-	int32 PlayerStartIndex = 0;
-	for (FConstPlayerControllerIterator Iterator = World->GetPlayerControllerIterator(); Iterator; ++Iterator)
-	{
-		APlayerController* PlayerController = Iterator->Get();
-		if (!IsValid(PlayerController))
-		{
-			continue;
-		}
-		
-		AP2CPlayerState* PlayerState = PlayerController->GetPlayerState<AP2CPlayerState>();
-		AP2CCharacter* Character = Cast<AP2CCharacter>(PlayerController->GetPawn());
-		
-		if (!IsValid(PlayerState) || !PlayerState->IsAlive() || !IsValid(Character))
-		{
-			continue;
-		}
-		
-		UP2CPlayerStatsComponent* StatsComponent = Character->GetPlayerStatsComponent();
-		if (IsValid(StatsComponent))
-		{
-			StatsComponent->ResetStats();
-		}
-		
-		Character->SetActorEnableCollision(true);
-		if (UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement())
-		{
-			MovementComponent->StopMovementImmediately();
-		}
-		
-		if (PlayerStarts.IsValidIndex(PlayerStartIndex))
-		{
-			APlayerStart* PlayerStart = PlayerStarts[PlayerStartIndex];
-			Character->SetActorLocationAndRotation(
-			PlayerStart->GetActorLocation(),
-			PlayerStart->GetActorRotation(),
-			false,
-			nullptr,
-			ETeleportType::TeleportPhysics
-			);
-			PlayerController->SetControlRotation(PlayerStart->GetActorRotation());
-		}
+		ResetAliveCharacter(
+			AliveCharacters[Index],
+			AvailablePlayerStarts[Index]
+		);
 	}
 }
 
@@ -678,4 +660,148 @@ void AP2CArenaGameMode::ReturnToLobby()
 			);
 		}
 	}
+}
+
+void AP2CArenaGameMode::GatherAliveCharacters(TArray<AP2CCharacter*>& OutCharacters) const
+{
+	OutCharacters.Reset();
+
+	UWorld* World = GetWorld();
+
+	if (!IsValid(World))
+	{
+		return;
+	}
+
+	for (FConstPlayerControllerIterator Iterator = World->GetPlayerControllerIterator(); Iterator; ++Iterator)
+	{
+		APlayerController* PlayerController = Iterator->Get();
+
+		if (!IsValid(PlayerController))
+		{
+			continue;
+		}
+
+		AP2CPlayerState* PlayerState = PlayerController->GetPlayerState<AP2CPlayerState>();
+		AP2CCharacter* Character = Cast<AP2CCharacter>(PlayerController->GetPawn());
+
+		if (IsValid(PlayerState) && PlayerState->IsAlive() && IsValid(Character))
+		{
+			OutCharacters.Add(Character);
+		}
+	}
+}
+
+void AP2CArenaGameMode::GatherPlayerStarts(TArray<APlayerStart*>& OutPlayerStarts) const
+{
+	OutPlayerStarts.Reset();
+	UWorld* World = GetWorld();
+
+	if (!IsValid(World))
+	{
+		return;
+	}
+
+	for (TActorIterator<APlayerStart> Iterator(World); Iterator; ++Iterator)
+	{
+		APlayerStart* PlayerStart = *Iterator;
+
+		if (IsValid(PlayerStart))
+		{
+			OutPlayerStarts.Add(PlayerStart);
+		}
+	}
+}
+
+void AP2CArenaGameMode::ShufflePlayerStarts(TArray<APlayerStart*>& PlayerStarts) const
+{
+	for (int32 Index = PlayerStarts.Num() - 1; Index > 0; --Index)
+	{
+		const int32 RandomIndex = FMath::RandRange(0, Index);
+
+		PlayerStarts.Swap(Index, RandomIndex);
+	}
+}
+
+void AP2CArenaGameMode::ResetAliveCharacter(AP2CCharacter* Character, APlayerStart* PlayerStart)
+{
+	if (!IsValid(Character) || !IsValid(PlayerStart))
+	{
+		return;
+	}
+	
+	Character->SetActorHiddenInGame(false);
+	Character->SetActorEnableCollision(true);
+
+	if (UP2CPlayerStatsComponent* StatsComponent = Character->GetPlayerStatsComponent())
+	{
+		StatsComponent->ResetStats();
+	}
+
+	if (UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement())
+	{
+		MovementComponent->StopMovementImmediately();
+	}
+
+	const FRotator SpawnRotation(
+		0.0f,
+		PlayerStart->GetActorRotation().Yaw,
+		0.0f
+	);
+
+	Character->SetActorLocationAndRotation(
+		PlayerStart->GetActorLocation(),
+		SpawnRotation,
+		false,
+		nullptr,
+		ETeleportType::TeleportPhysics
+	);
+
+	AP2CPlayerController* P2CPlayerController = Cast<AP2CPlayerController>(Character->GetController());
+
+	if (IsValid(P2CPlayerController))
+	{
+		P2CPlayerController->SetControlRotation(SpawnRotation);
+		
+		P2CPlayerController->ClientHandleArenaTeleport(SpawnRotation);
+	}
+
+	UE_LOG(
+		LogP2CArena,
+		Verbose,
+		TEXT(
+			"Reset %s at %s."
+		),
+		*GetNameSafe(Character),
+		*GetNameSafe(PlayerStart)
+	);
+}
+
+void AP2CArenaGameMode::CompletedExplosionResolution()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	
+	if (PendingOverviewPlayerController.IsValid())
+	{
+		PendingOverviewPlayerController->ClientEnterArenaOverview();
+	}
+	
+	PendingOverviewPlayerController.Reset();
+	
+	AP2CArenaGameState* ArenaGameState = GetP2CArenaGameState();
+	if (!IsValid(ArenaGameState))
+	{
+		return;
+	}
+	
+	if (ArenaGameState->GetAlivePlayerCount() <= 1)
+	{
+		EndArenaRound();
+		return;
+	}
+
+	StartNextBombCycle();
 }

@@ -72,6 +72,8 @@ private:
 	FTimerHandle NextBombCycleTimerHandle;
 	FTimerHandle ReturnToLobbyTimerHandle;
 	
+	TWeakObjectPtr<AP2CPlayerController> PendingOverviewPlayerController;
+	
 	void TryStartPreparation();
 	void StartPreparation(AP2CCharacter* InitialHolder);
 	void ActiveBombRound();
@@ -93,4 +95,10 @@ private:
 	void ResetAlivePlayersForNextCycle();
 	void EndArenaRound();
 	void ReturnToLobby();
+	
+	void GatherAliveCharacters(TArray<AP2CCharacter*>& OutCharacters) const;
+	void GatherPlayerStarts(TArray<APlayerStart*>& OutPlayerStarts) const;
+	void ShufflePlayerStarts(TArray<APlayerStart*>& PlayerStarts) const;
+	void ResetAliveCharacter(AP2CCharacter* Character, APlayerStart* PlayerStart);
+	void CompletedExplosionResolution();
 };

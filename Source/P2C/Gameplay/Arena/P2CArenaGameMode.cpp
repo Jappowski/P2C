@@ -6,14 +6,17 @@
 #include "P2CPlayerController.h"
 #include "VisualizeTexture.h"
 #include "Bomb/P2CBomb.h"
+#include "Engine/TargetPoint.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "GameFramework/PlayerStart.h"
 #include "Gameplay/P2CGameRules.h"
 #include "Map/P2CTravelSubsystem.h"
+#include "Pickups/P2CStaminaPickup.h"
 #include "Player/P2CPlayerState.h"
 #include "Player/Components/P2CPlayerStatsComponent.h"
 
+class ATargetPoint;
 DEFINE_LOG_CATEGORY_STATIC(LogP2CArena, Log, All);
 
 AP2CArenaGameMode::AP2CArenaGameMode()
@@ -74,7 +77,34 @@ bool AP2CArenaGameMode::TryThrowBomb(AP2CPlayerController* RequestingController)
 		return false;
 	}
 	
-	return ActiveBomb->LaunchFromHolder(Thrower->GetActorForwardVector());
+	UP2CPlayerStatsComponent* StatsComponent = Thrower->GetPlayerStatsComponent();
+	if (!IsValid(StatsComponent))
+	{
+		UE_LOG(
+			LogP2CArena,
+			Error,
+			TEXT(
+				"Cannot throw bomb: %s has no StatsComponent."
+			),
+			*GetNameSafe(Thrower)
+		);
+
+		return false;
+	}
+	
+	if (!StatsComponent->CanConsumeStamina(BombThrowStaminaCost))
+	{
+		return false;
+	}
+	
+	const bool bBombLaunched = ActiveBomb->LaunchFromHolder(Thrower->GetActorForwardVector());
+
+	if (!bBombLaunched)
+	{
+		return false;
+	}
+	
+	return StatsComponent->ConsumeStamina(BombThrowStaminaCost);
 }
 
 bool AP2CArenaGameMode::TryPassBombToCharacter(AP2CBomb* Bomb, AP2CCharacter* TargetCharacter) const
@@ -182,6 +212,7 @@ void AP2CArenaGameMode::ActiveBombRound()
 	}
 	
 	StartBombFuse();
+	StartStaminaPickupCycle();
 }
 
 void AP2CArenaGameMode::SetAllPlayerMovementEnabled(bool bEnabled)
@@ -280,6 +311,7 @@ AP2CCharacter* AP2CArenaGameMode::ChooseRandomAliveCharacter()
 
 void AP2CArenaGameMode::InitializeArena()
 {
+	CacheStaminaPickupSpawnPoints();
 	AP2CArenaGameState* ArenaGameState = GetP2CArenaGameState();
 	
 	if (!IsValid(ArenaGameState))
@@ -398,7 +430,7 @@ void AP2CArenaGameMode::HandleBombFuseExpired()
 	}
 	
 	AP2CCharacter* ResponsibleCharacter = ActiveBomb->GetResponsibleCharacter();
-	
+	ResetStaminaPickupCycle();
 	ArenaGameState->SetArenaPhase(EP2CArenaPhase::ResolvingExplosion);
 	ActiveBomb->Explode();
 	
@@ -598,6 +630,7 @@ void AP2CArenaGameMode::EndArenaRound()
 		WinnerPlayerState->AddMatchPoints(1);
 	}
 	
+	ResetStaminaPickupCycle();
 	ArenaGameState->SetArenaPhase(EP2CArenaPhase::RoundEnded);
 	
 	GetWorldTimerManager().SetTimer(
@@ -804,4 +837,172 @@ void AP2CArenaGameMode::CompletedExplosionResolution()
 	}
 
 	StartNextBombCycle();
+}
+
+void AP2CArenaGameMode::CacheStaminaPickupSpawnPoints()
+{
+	PickupSpawnPoints.Reset();
+	UWorld* World = GetWorld();
+	
+	if (!IsValid(World))
+	{
+		return;
+	}
+	
+	for (TActorIterator<ATargetPoint> Iterator(World); Iterator; ++Iterator)
+	{
+		ATargetPoint* SpawnPoint = *Iterator;
+		if (IsValid(SpawnPoint) && SpawnPoint->ActorHasTag(PickupSpawnTag))
+		{
+			PickupSpawnPoints.Add(SpawnPoint);
+		}
+	}
+	
+	UE_LOG(
+		LogP2CArena,
+		Log,
+		TEXT("Found %d stamina pickup spawn points"),
+		PickupSpawnPoints.Num()
+	);
+}
+
+void AP2CArenaGameMode::StartStaminaPickupCycle()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	ResetStaminaPickupCycle();
+	if (!StaminaPickupClass || PickupSpawnPoints.IsEmpty())
+	{
+		return;
+	}
+	
+	const float MinDelay =
+		FMath::Min(
+			PickupSpawnDelayMin,
+			PickupSpawnDelayMax
+		);
+
+	const float MaxDelay =
+		FMath::Max(
+			PickupSpawnDelayMin,
+			PickupSpawnDelayMax
+		);
+
+	const float SpawnDelay = FMath::FRandRange(MinDelay, MaxDelay);
+	if (SpawnDelay <= 0.0f)
+	{
+		GetWorldTimerManager().SetTimerForNextTick(
+			this,
+			&ThisClass::SpawnStaminaPickup
+		);
+
+		return;
+	}
+	
+	GetWorldTimerManager().SetTimer(
+		PickupSpawnTimerHandle,
+		this,
+		&ThisClass::SpawnStaminaPickup,
+		SpawnDelay,
+		false
+	);
+}
+
+void AP2CArenaGameMode::SpawnStaminaPickup()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	
+	AP2CArenaGameState* ArenaGameState = GetP2CArenaGameState();
+	if (!IsValid(ArenaGameState) || ArenaGameState->GetArenaPhase() != EP2CArenaPhase::BombActive)
+	{
+		return;
+	}
+	
+	if (!StaminaPickupClass || PickupSpawnPoints.IsEmpty() ||ActiveStaminaPickup.IsValid())
+	{
+		return;
+	}
+	
+	TArray<ATargetPoint*> ValidSpawnPoints;
+
+	for (const TWeakObjectPtr<ATargetPoint>& SpawnPoint : PickupSpawnPoints)
+	{
+		if (SpawnPoint.IsValid())
+		{
+			ValidSpawnPoints.Add(SpawnPoint.Get());
+		}
+	}
+	
+	if (ValidSpawnPoints.IsEmpty())
+	{
+		UE_LOG(
+			LogP2CArena,
+			Error,
+			TEXT(
+				"Cannot spawn stamina pickup: "
+				"no valid spawn points."
+			)
+		);
+
+		return;
+	}
+	
+	ATargetPoint* SelectedSpawnPoint =
+		ValidSpawnPoints[
+			FMath::RandRange(
+				0,
+				ValidSpawnPoints.Num() - 1
+			)
+		];
+
+	FActorSpawnParameters SpawnParameters;
+
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AP2CStaminaPickup* SpawnedPickup = GetWorld()->SpawnActor<AP2CStaminaPickup>(
+			StaminaPickupClass,
+			SelectedSpawnPoint->GetActorTransform(),
+			SpawnParameters
+		);
+	
+	if (!IsValid(SpawnedPickup))
+	{
+		UE_LOG(
+			LogP2CArena,
+			Error,
+			TEXT("Failed to spawn stamina pickup.")
+		);
+
+		return;
+	}
+	
+	ActiveStaminaPickup = SpawnedPickup;
+
+	UE_LOG(
+		LogP2CArena,
+		Log,
+		TEXT("Spawned stamina pickup at %s."),
+		*GetNameSafe(SelectedSpawnPoint)
+	);
+}
+
+void AP2CArenaGameMode::ResetStaminaPickupCycle()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	GetWorldTimerManager().ClearTimer(PickupSpawnTimerHandle);
+
+	if (ActiveStaminaPickup.IsValid())
+	{
+		ActiveStaminaPickup->Destroy();
+	}
+
+	ActiveStaminaPickup.Reset();
 }

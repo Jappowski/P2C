@@ -3,8 +3,10 @@
 #include "CoreMinimal.h"
 #include "P2CGameMode.h"
 #include "P2CPlayerController.h"
+#include "Engine/TargetPoint.h"
 #include "P2CArenaGameMode.generated.h"
 
+class AP2CStaminaPickup;
 class AP2CCharacter;
 class AP2CBomb;
 class AP2CArenaGameState;
@@ -69,6 +71,36 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "P2C|Bomb")
 	TSubclassOf<AP2CBomb> BombClass;
+	
+	UPROPERTY(
+	EditDefaultsOnly,
+	BlueprintReadOnly,
+	Category = "P2C|Arena|Pickup"
+	)
+	TSubclassOf<AP2CStaminaPickup> StaminaPickupClass;
+	
+	UPROPERTY(
+	EditDefaultsOnly,
+	BlueprintReadOnly,
+	Category = "P2C|Arena|Pickup",
+	meta = (ClampMin = "0.0")
+	)
+	float PickupSpawnDelayMin = 5.0f;
+	
+	UPROPERTY(
+	EditDefaultsOnly,
+	BlueprintReadOnly,
+	Category = "P2C|Arena|Pickup",
+	meta = (ClampMin = "0.0")
+	)
+	float PickupSpawnDelayMax = 10.0f;
+	
+	UPROPERTY(
+	EditDefaultsOnly,
+	BlueprintReadOnly,
+	Category = "P2C|Arena|Pickup"
+	)
+	FName PickupSpawnTag =TEXT("PickupSpawn");
 
 private:
 	UPROPERTY(Transient)
@@ -79,8 +111,12 @@ private:
 	FTimerHandle BombFuseTimerHandle;
 	FTimerHandle NextBombCycleTimerHandle;
 	FTimerHandle ReturnToLobbyTimerHandle;
+	FTimerHandle PickupSpawnTimerHandle;
 	
 	TWeakObjectPtr<AP2CPlayerController> PendingOverviewPlayerController;
+	
+	TArray<TWeakObjectPtr<ATargetPoint>> PickupSpawnPoints;
+	TWeakObjectPtr<AP2CStaminaPickup> ActiveStaminaPickup;
 	
 	void TryStartPreparation();
 	void StartPreparation(AP2CCharacter* InitialHolder);
@@ -109,4 +145,9 @@ private:
 	void ShufflePlayerStarts(TArray<APlayerStart*>& PlayerStarts) const;
 	void ResetAliveCharacter(AP2CCharacter* Character, APlayerStart* PlayerStart);
 	void CompletedExplosionResolution();
+	
+	void CacheStaminaPickupSpawnPoints();
+	void StartStaminaPickupCycle();
+	void SpawnStaminaPickup();
+	void ResetStaminaPickupCycle();
 };

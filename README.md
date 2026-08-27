@@ -1,7 +1,23 @@
-# P2C# P2C
+## Recruitment Task Context
 
-P2C is a small multiplayer arena prototype built in **Unreal Engine 5.7** with **C++**.
+This project was created as a **recruitment task for P2C**.
 
+The assignment was focused on building a small **multiplayer arena prototype in Unreal Engine**, with emphasis on networking, replication, gameplay flow, and clean C++ architecture.
+
+At a high level, the task required:
+
+* a host/join multiplayer flow with a simple lobby,
+* starting a match once players are ready,
+* a replicated third-person arena gameplay loop,
+* basic player statistics and interactions,
+* at least one networked gameplay action,
+* a round end condition with score summary and return to the lobby,
+* basic consideration of network and Tick optimization,
+* implementation primarily in C++, with Blueprint used for configuration and presentation,
+* a version-controlled repository with clear documentation.
+
+This repository contains my implementation of that assignment, built in **Unreal Engine 5.7** primarily with **C++**.
+The implementation focuses on multiplayer architecture rather than content volume. It demonstrates a complete listen-server flow: session discovery, lobby readiness, seamless travel, server-authoritative arena gameplay, round resolution, score persistence, and returning to the lobby for another round.
 The project focuses on multiplayer architecture rather than content volume. It demonstrates a complete listen-server flow: session discovery, lobby readiness, seamless travel, server-authoritative arena gameplay, round resolution, score persistence, and returning to the lobby for another round.
 
 ## Branching Strategy
@@ -28,7 +44,7 @@ Main Menu
     > Next Round
 ```
 
-The current development backend is **Online Subsystem Null**, used for LAN testing in the editor and local packaged builds. Steam integration is intentionally kept separate from gameplay and lobby logic and is reserved for packaged-build testing.
+The current multiplayer backend is **Online Subsystem Null**, used for LAN testing in both the editor and packaged Windows builds. The session and gameplay architecture is intentionally kept independent of a specific online provider, allowing another subsystem such as Steam to be integrated separately.
 
 ## Features
 
